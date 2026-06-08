@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Finviz-style stock screener with heat maps, real-time quotes, and customizable filters." />
+    <title>StockViz — Stock Screener & Heat Map</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="site-header">
+        <div class="header-inner">
+          <a href="#/" class="logo">
+            <span class="logo-mark">SV</span>
+            <span class="logo-text">Stock<span class="accent">Viz</span></span>
+          </a>
+          <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
+            <span></span><span></span><span></span>
+          </button>
+          <nav class="main-nav" aria-label="Main">
+            <a href="#/" data-route="home">Home</a>
+            <a href="#/screener" data-route="screener">Screener</a>
+            <a href="#/map" data-route="map">Heat Map</a>
+            <a href="#/news" data-route="news">News</a>
+            <a href="#/settings" data-route="settings">Settings</a>
+          </nav>
+          <div class="header-status">
+            <span class="market-status" id="market-status"></span>
+            <span class="status-dot" id="status-dot"></span>
+            <span class="status-text" id="status-text">Connecting…</span>
+            <span class="last-update" id="last-update"></span>
+          </div>
+        </div>
+      </header>
+
+      <div class="ticker-bar" id="ticker-bar" aria-label="Market indices"></div>
+
+      <main class="main-content" id="main-content"></main>
+
+      <aside class="quote-panel" id="quote-panel" aria-label="Quote detail" hidden>
+        <button class="quote-close" id="quote-close" aria-label="Close quote panel">&times;</button>
+        <div id="quote-panel-body"></div>
+      </aside>
+      <div class="quote-overlay" id="quote-overlay" hidden></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
