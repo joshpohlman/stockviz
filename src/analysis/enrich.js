@@ -50,14 +50,15 @@ function seededRand(seed) {
 }
 
 /** Full TA enrichment — patterns, signals, prediction, TradingView-style fundamentals. */
-export function enrichWithTA(quote, { finnhubMetrics = null } = {}) {
+export function enrichWithTA(quote, { finnhubMetrics = null, fmpMetrics = null } = {}) {
   const candles = updateCandleCache(quote.symbol, quote);
   const patterns = detectPatterns(candles);
   const signals = detectSignals(candles, quote);
   const prediction = predictTrend(candles, quote, patterns);
 
   const volAvg = avgVolume(candles);
-  const fundamentals = buildFundamentals(quote, candles, finnhubMetrics);
+  const extMetrics = fmpMetrics || finnhubMetrics;
+  const fundamentals = buildFundamentals(quote, candles, extMetrics);
 
   return {
     ...quote,

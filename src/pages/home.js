@@ -6,7 +6,7 @@ import {
   SIGNAL_GROUPS, PATTERN_GROUPS, FUTURES, FOREX, BONDS,
   INSIDER_TRADES, EARNINGS_CALENDAR, ECON_CALENDAR,
 } from '../data/marketData.js';
-import { fetchMarketNews } from '../api.js';
+import { fetchMarketNews, fetchMarketWidgets } from '../api.js';
 
 const LEFT_TAPE = [
   { signal: 'top_gainers', limit: 7, sort: (a, b) => b.changePct - a.changePct },
@@ -28,15 +28,25 @@ export async function renderHome(container) {
   const settings = getSettings();
   const rows = [...quotes.values()];
   const breadth = getMarketBreadth(quotes);
-  const news = await fetchMarketNews(settings).catch(() => []);
+  const [news, widgets] = await Promise.all([
+    fetchMarketNews(settings).catch(() => []),
+    fetchMarketWidgets(settings).catch(() => null),
+  ]);
+
+  const earningsData = widgets?.earnings?.length ? widgets.earnings : EARNINGS_CALENDAR;
+  const econData = widgets?.economic?.length ? widgets.economic : ECON_CALENDAR;
+  const insiderData = widgets?.insider?.length ? widgets.insider : INSIDER_TRADES;
+  const futuresData = widgets?.futures?.length ? widgets.futures : FUTURES;
+  const forexData = widgets?.forex?.length ? widgets.forex : FOREX;
+  const bondsData = widgets?.bonds?.length ? widgets.bonds : BONDS;
 
   const leftRows = buildTape(rows, LEFT_TAPE);
   const rightRows = buildTape(rows, RIGHT_TAPE);
 
-  const earningsBefore = EARNINGS_CALENDAR.filter((e) => /BMO|before/i.test(e.date));
-  const earningsAfter = EARNINGS_CALENDAR.filter((e) => /AMC|after|Today/i.test(e.date));
-  const insiderBuys = INSIDER_TRADES.filter((t) => t.type === 'Buy').slice(0, 2);
-  const insiderSells = INSIDER_TRADES.filter((t) => t.type === 'Sale').slice(0, 2);
+  const earningsBefore = earningsData.filter((e) => /BMO|before/i.test(e.date));
+  const earningsAfter = earningsData.filter((e) => /AMC|after|Today/i.test(e.date));
+  const insiderBuys = insiderData.filter((t) => t.type === 'Buy').slice(0, 2);
+  const insiderSells = insiderData.filter((t) => t.type === 'Sale').slice(0, 2);
 
   const majorNews = rows
     .filter((q) => Math.abs(q.changePct) >= 1.5)
@@ -152,7 +162,7 @@ export async function renderHome(container) {
           <table class="data-table compact finviz-tbl home-mini-tbl">
             <thead><tr><th>Date</th><th>Time</th><th>Impact</th><th>Event</th><th>Expected</th></tr></thead>
             <tbody>
-              ${ECON_CALENDAR.slice(0, 4).map((e) => `
+              ${econData.slice(0, 4).map((e) => `
                 <tr>
                   <td>${e.date}</td>
                   <td>${e.time}</td>
@@ -170,7 +180,7 @@ export async function renderHome(container) {
           <table class="data-table compact finviz-tbl home-mini-tbl">
             <thead><tr><th>Date</th><th>Symbol</th></tr></thead>
             <tbody>
-              ${EARNINGS_CALENDAR.slice(0, 6).map((e) => `
+              ${earningsData.slice(0, 6).map((e) => `
                 <tr class="clickable" data-symbol="${e.symbol}">
                   <td>${e.date}</td>
                   <td class="sym">${e.symbol}</td>
@@ -185,7 +195,7 @@ export async function renderHome(container) {
           <table class="data-table compact finviz-tbl home-mini-tbl">
             <thead><tr><th>Ticker</th><th>Insider</th><th>Date</th><th>Type</th><th>Value</th></tr></thead>
             <tbody>
-              ${INSIDER_TRADES.slice(0, 5).map((t) => `
+              ${insiderData.slice(0, 5).map((t) => `
                 <tr class="clickable" data-symbol="${t.symbol}">
                   <td class="sym">${t.symbol}</td>
                   <td>${t.insider.split(' ')[0]}</td>
@@ -203,7 +213,7 @@ export async function renderHome(container) {
           <table class="data-table compact finviz-tbl home-mini-tbl">
             <thead><tr><th>Contract</th><th>Last</th><th>Chg</th><th>Chg %</th></tr></thead>
             <tbody>
-              ${FUTURES.map((f) => `
+              ${futuresData.map((f) => `
                 <tr>
                   <td>${f.name}</td>
                   <td>${f.last > 1000 ? f.last.toLocaleString() : fmtPrice(f.last)}</td>
@@ -220,7 +230,7 @@ export async function renderHome(container) {
           <table class="data-table compact finviz-tbl home-mini-tbl">
             <thead><tr><th>Pair / Bond</th><th>Last</th><th>Chg %</th></tr></thead>
             <tbody>
-              ${[...FOREX, ...BONDS].map((f) => `
+              ${[...forexData, ...bondsData].map((f) => `
                 <tr>
                   <td>${f.pair || f.name}</td>
                   <td>${typeof f.last === 'number' && f.last > 100 ? f.last.toLocaleString() : fmtPrice(f.last)}</td>

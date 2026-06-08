@@ -114,6 +114,9 @@ function updateStatus(source) {
   if (source === 'error') {
     dot.className = 'status-dot';
     text.textContent = 'Update failed';
+  } else if (source === 'fmp') {
+    dot.className = 'status-dot live';
+    text.textContent = 'Live · FMP';
   } else if (source === 'finnhub') {
     dot.className = 'status-dot live';
     text.textContent = 'Live · Finnhub';

@@ -133,6 +133,34 @@ export function buildFundamentals(quote, candles, finnhubMetrics = null) {
   };
 }
 
+/** Map FMP ratios-ttm + key-metrics-ttm + profile to our schema. */
+export function mapFmpMetrics({ ratios, metrics, profile } = {}) {
+  if (!ratios && !metrics) return null;
+  const r = ratios || {};
+  const m = metrics || {};
+  return {
+    peTTM: r.priceToEarningsRatioTTM ?? r.peRatioTTM,
+    peFwd: r.priceToEarningsRatioTTM,
+    peg: r.priceToEarningsGrowthRatioTTM ?? r.pegRatioTTM,
+    ps: r.priceToSalesRatioTTM,
+    pb: r.priceToBookRatioTTM,
+    evEbitda: m.enterpriseValueOverEBITDATTM ?? r.enterpriseValueMultipleTTM,
+    epsTTM: r.netIncomePerShareTTM ?? m.netIncomePerShareTTM,
+    epsGrowthTTMYoy: r.revenueGrowthTTM ?? m.revenuePerShareTTM,
+    dividendYield: r.dividendYieldTTM ?? r.dividendYielTTM,
+    beta: profile?.beta ?? r.betaTTM,
+    high52: profile?.range?.split('-')?.[1]?.trim() || null,
+    low52: profile?.range?.split('-')?.[0]?.trim() || null,
+    grossMarginTTM: r.grossProfitMarginTTM,
+    operatingMarginTTM: r.operatingProfitMarginTTM,
+    netProfitMarginTTM: r.netProfitMarginTTM,
+    roeTTM: r.returnOnEquityTTM,
+    roaTTM: r.returnOnAssetsTTM,
+    sharesOutstanding: profile?.sharesOutstanding,
+    floatShares: profile?.floatShares,
+  };
+}
+
 /** Map Finnhub /stock/metric response to our schema. */
 export function mapFinnhubMetrics(data) {
   const m = data?.metric;

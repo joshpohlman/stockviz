@@ -1,5 +1,6 @@
 const DEFAULT_SETTINGS = {
   apiKey: '',
+  fmpApiKey: '',
   refreshInterval: 30,
   useMockData: true,
   watchlist: ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA'],
@@ -122,7 +123,10 @@ export function getSettings() {
 
 export function updateSettings(patch) {
   settings = { ...settings, ...patch };
-  if (patch.apiKey !== undefined) settings.useMockData = !patch.apiKey?.trim();
+  if (patch.useMockData === undefined && (patch.apiKey !== undefined || patch.fmpApiKey !== undefined)) {
+    const hasKey = settings.fmpApiKey?.trim() || settings.apiKey?.trim();
+    settings.useMockData = !hasKey;
+  }
   saveSettings();
 }
 

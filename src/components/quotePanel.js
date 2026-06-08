@@ -1,4 +1,4 @@
-import { fetchSingleQuote, fetchCandles, fetchCompanyNews, fetchStockMetrics } from '../api.js';
+import { fetchSingleQuote, fetchCandles, fetchCompanyNews, fetchStockMetrics, getDataProvider } from '../api.js';
 import { getSettings, getQuotes, setSelectedSymbol, toggleFavorite, isFavorite, toggleCompare, getCompareList, addAlert } from '../store.js';
 import { enrichWithTA } from '../analysis/enrich.js';
 import { fmtPrice, fmtChange, fmtPct, fmtVolume, fmtMarketCap, changeClass } from '../utils/format.js';
@@ -51,7 +51,10 @@ async function loadQuote(symbol) {
 
   let quote = fetched;
   if (quote && metrics && !cached?.fundamentals?.peg) {
-    quote = enrichWithTA(quote, { finnhubMetrics: metrics });
+    const enrichOpts = getDataProvider(settings) === 'fmp'
+      ? { fmpMetrics: metrics }
+      : { finnhubMetrics: metrics };
+    quote = enrichWithTA(quote, enrichOpts);
   }
 
   const candles = quote?.candles || await fetchCandles(symbol, settings);

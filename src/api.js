@@ -1,10 +1,30 @@
 import { UNIVERSE } from './data/universe.js';
 import { enrichWithTA } from './analysis/enrich.js';
-import { mapFinnhubMetrics } from './analysis/fundamentals.js';
+import { mapFinnhubMetrics, mapFmpMetrics } from './analysis/fundamentals.js';
+import {
+  fetchFmpBatchQuotes,
+  fetchFmpQuote,
+  fetchFmpProfile,
+  fetchFmpFundamentals,
+  fetchFmpCandles,
+  fetchFmpGeneralNews,
+  fetchFmpStockNews,
+  fetchFmpMarketHours,
+  fetchFmpMarketWidgets,
+  validateFmpApiKey,
+} from './api/fmp.js';
+import { getCachedMarketWidgets, setCachedMarketWidgets } from './api/marketExtras.js';
 
 const FINNHUB_BASE = 'https://finnhub.io/api/v1';
 const BATCH_SIZE = 5;
 const BATCH_DELAY_MS = 1100;
+
+export function getDataProvider(settings) {
+  if (settings.useMockData) return 'mock';
+  if (settings.fmpApiKey?.trim()) return 'fmp';
+  if (settings.apiKey?.trim()) return 'finnhub';
+  return 'mock';
+}
 
 function seededRandom(seed) {
   let h = 0;
@@ -177,12 +197,12 @@ function delay(ms) {
 function enrichQuote(quote, meta, profile) {
   return {
     ...quote,
-    name: profile?.name || meta?.name || quote.symbol,
-    sector: meta?.sector || profile?.finnhubIndustry || '—',
-    industry: meta?.industry || profile?.finnhubIndustry || '—',
+    name: profile?.name || profile?.companyName || meta?.name || quote.name || quote.symbol,
+    sector: meta?.sector || profile?.sector || profile?.finnhubIndustry || '—',
+    industry: meta?.industry || profile?.industry || profile?.finnhubIndustry || '—',
     marketCap: profile?.marketCapitalization
       ? profile.marketCapitalization * 1_000_000
-      : meta?.marketCap,
+      : profile?.marketCap || quote.marketCap || meta?.marketCap,
     volume: quote.volume ?? Math.floor(Math.random() * 20_000_000 + 1_000_000),
     sparkline: getSparkline(quote.symbol),
   };
@@ -191,12 +211,39 @@ function enrichQuote(quote, meta, profile) {
 export async function fetchAllQuotes(settings) {
   const universeMap = new Map(UNIVERSE.map((s) => [s.symbol, s]));
   const symbols = UNIVERSE.map((s) => s.symbol);
+  const provider = getDataProvider(settings);
 
-  if (!settings.apiKey?.trim() || settings.useMockData) {
+  if (provider === 'mock') {
     tickMockPrices();
     const quotes = new Map();
     for (const stock of UNIVERSE) quotes.set(stock.symbol, enrichWithTA(buildMockQuote(stock)));
     return { quotes, source: 'mock' };
+  }
+
+  if (provider === 'fmp') {
+    const apiKey = settings.fmpApiKey.trim();
+    const quotes = new Map();
+    try {
+      const fmpQuotes = await fetchFmpBatchQuotes(symbols, apiKey);
+      for (const symbol of symbols) {
+        const q = fmpQuotes.get(symbol);
+        if (q) {
+          const meta = universeMap.get(symbol);
+          const enriched = enrichQuote(q, meta);
+          quotes.set(symbol, enrichWithTA({
+            ...enriched,
+            sparkline: pushSpark(symbol, enriched.price),
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('FMP batch quotes failed:', err);
+    }
+
+    for (const stock of UNIVERSE) {
+      if (!quotes.has(stock.symbol)) quotes.set(stock.symbol, enrichWithTA(buildMockQuote(stock)));
+    }
+    return { quotes, source: 'fmp' };
   }
 
   const quotes = new Map();
@@ -240,9 +287,27 @@ async function fetchFinnhubMetrics(symbol, apiKey) {
 
 export async function fetchSingleQuote(symbol, settings) {
   const meta = UNIVERSE.find((s) => s.symbol === symbol);
-  if (!settings.apiKey?.trim() || settings.useMockData) {
+  const provider = getDataProvider(settings);
+
+  if (provider === 'mock') {
     return meta ? enrichWithTA(buildMockQuote(meta)) : null;
   }
+
+  if (provider === 'fmp') {
+    try {
+      const key = settings.fmpApiKey.trim();
+      const [quote, fundData] = await Promise.all([
+        fetchFmpQuote(symbol, key),
+        fetchFmpFundamentals(symbol, key).catch(() => null),
+      ]);
+      const metrics = fundData ? mapFmpMetrics(fundData) : null;
+      const enriched = enrichQuote(quote, meta, fundData?.profile);
+      return enrichWithTA(enriched, { fmpMetrics: metrics });
+    } catch {
+      return meta ? enrichWithTA(buildMockQuote(meta)) : null;
+    }
+  }
+
   try {
     const key = settings.apiKey.trim();
     const [quote, profile, metrics] = await Promise.all([
@@ -257,7 +322,18 @@ export async function fetchSingleQuote(symbol, settings) {
 }
 
 export async function fetchStockMetrics(symbol, settings) {
-  if (!settings.apiKey?.trim() || settings.useMockData) return null;
+  const provider = getDataProvider(settings);
+  if (provider === 'mock') return null;
+
+  if (provider === 'fmp') {
+    try {
+      const data = await fetchFmpFundamentals(symbol, settings.fmpApiKey.trim());
+      return mapFmpMetrics(data);
+    } catch {
+      return null;
+    }
+  }
+
   try {
     return await fetchFinnhubMetrics(symbol, settings.apiKey.trim());
   } catch {
@@ -266,9 +342,17 @@ export async function fetchStockMetrics(symbol, settings) {
 }
 
 export async function fetchCandles(symbol, settings, resolution = 'D', count = 60) {
-  if (!settings.apiKey?.trim() || settings.useMockData) {
+  const provider = getDataProvider(settings);
+  if (provider === 'mock') return buildMockCandles(symbol, count);
+
+  if (provider === 'fmp') {
+    try {
+      const candles = await fetchFmpCandles(symbol, settings.fmpApiKey.trim(), count);
+      if (candles?.length) return candles;
+    } catch { /* fall through */ }
     return buildMockCandles(symbol, count);
   }
+
   try {
     const to = Math.floor(Date.now() / 1000);
     const from = to - count * 86400;
@@ -291,7 +375,17 @@ export async function fetchCandles(symbol, settings, resolution = 'D', count = 6
 }
 
 export async function fetchCompanyNews(symbol, settings) {
-  if (!settings.apiKey?.trim() || settings.useMockData) return buildMockNews(symbol);
+  const provider = getDataProvider(settings);
+  if (provider === 'mock') return buildMockNews(symbol);
+
+  if (provider === 'fmp') {
+    try {
+      return await fetchFmpStockNews(symbol, settings.fmpApiKey.trim());
+    } catch {
+      return buildMockNews(symbol);
+    }
+  }
+
   try {
     const to = new Date().toISOString().slice(0, 10);
     const from = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
@@ -306,7 +400,17 @@ export async function fetchCompanyNews(symbol, settings) {
 }
 
 export async function fetchMarketNews(settings) {
-  if (!settings.apiKey?.trim() || settings.useMockData) return buildMockNews(null);
+  const provider = getDataProvider(settings);
+  if (provider === 'mock') return buildMockNews(null);
+
+  if (provider === 'fmp') {
+    try {
+      return await fetchFmpGeneralNews(settings.fmpApiKey.trim());
+    } catch {
+      return buildMockNews(null);
+    }
+  }
+
   try {
     const url = `${FINNHUB_BASE}/news?category=general&token=${settings.apiKey.trim()}`;
     const res = await fetch(url);
@@ -319,11 +423,17 @@ export async function fetchMarketNews(settings) {
 }
 
 export async function fetchMarketStatus(settings) {
-  if (!settings.apiKey?.trim() || settings.useMockData) {
+  const provider = getDataProvider(settings);
+  if (provider === 'mock') {
     const h = new Date().getHours();
     const open = h >= 9 && h < 16;
     return { isOpen: open, label: open ? 'Market Open (simulated)' : 'Market Closed (simulated)' };
   }
+
+  if (provider === 'fmp') {
+    return fetchFmpMarketHours(settings.fmpApiKey.trim());
+  }
+
   try {
     const url = `${FINNHUB_BASE}/stock/market-status?exchange=US&token=${settings.apiKey.trim()}`;
     const res = await fetch(url);
@@ -339,6 +449,21 @@ export async function fetchMarketStatus(settings) {
   }
 }
 
+export async function fetchMarketWidgets(settings) {
+  if (getDataProvider(settings) !== 'fmp') return null;
+
+  const cached = getCachedMarketWidgets();
+  if (cached) return cached;
+
+  try {
+    const data = await fetchFmpMarketWidgets(settings.fmpApiKey.trim());
+    setCachedMarketWidgets(data);
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 export async function validateApiKey(apiKey) {
   if (!apiKey?.trim()) return { valid: false, message: 'API key is required' };
   try {
@@ -348,3 +473,5 @@ export async function validateApiKey(apiKey) {
     return { valid: false, message: e.message || 'Connection failed' };
   }
 }
+
+export { validateFmpApiKey };

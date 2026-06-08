@@ -1,4 +1,6 @@
 import { FUTURES, FOREX, BONDS } from '../data/marketData.js';
+import { getSettings } from '../store.js';
+import { fetchMarketWidgets } from '../api.js';
 import { fmtPrice, fmtPct, changeClass } from '../utils/format.js';
 
 function renderTable(title, rows, cols) {
@@ -22,13 +24,23 @@ function renderTable(title, rows, cols) {
   `;
 }
 
-export function renderFutures(container) {
+export async function renderFutures(container) {
+  const settings = getSettings();
+  const widgets = await fetchMarketWidgets(settings).catch(() => null);
+  const futures = widgets?.futures?.length ? widgets.futures : FUTURES;
+  const forex = widgets?.forex?.length ? widgets.forex : FOREX;
+  const bonds = widgets?.bonds?.length ? widgets.bonds : BONDS;
+  const live = !!widgets?.futures?.length;
+
   container.innerHTML = `
-    <div class="page-header"><h1>Futures &amp; Forex</h1></div>
+    <div class="page-header">
+      <h1>Futures &amp; Forex</h1>
+      ${live ? '<p class="page-sub">Live data from Financial Modeling Prep.</p>' : '<p class="page-sub">Simulated data — add an FMP API key in Settings for live futures and forex.</p>'}
+    </div>
     <div class="three-col">
-      ${renderTable('Futures', FUTURES, ['Contract', 'Last', 'Change', 'Change %'])}
-      ${renderTable('Forex & Crypto', FOREX, ['Pair', 'Last', 'Change', 'Change %'])}
-      ${renderTable('Bonds', BONDS, ['Bond', 'Yield', 'Change', 'Change %'])}
+      ${renderTable('Futures', futures, ['Contract', 'Last', 'Change', 'Change %'])}
+      ${renderTable('Forex & Crypto', forex, ['Pair', 'Last', 'Change', 'Change %'])}
+      ${renderTable('Bonds', bonds, ['Bond', 'Yield', 'Change', 'Change %'])}
     </div>
   `;
 }
