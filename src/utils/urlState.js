@@ -1,6 +1,9 @@
 import { getFilters, updateFilters } from '../store.js';
 
-const FILTER_KEYS = ['sector', 'minChange', 'maxChange', 'minVolume', 'minMarketCap', 'search'];
+const FILTER_KEYS = [
+  'sector', 'industry', 'minChange', 'maxChange', 'minVolume', 'minMarketCap', 'search',
+  'signal', 'pattern', 'prediction', 'minRsi', 'maxRsi', 'minPe', 'maxPe', 'aboveSma50', 'aboveSma200',
+];
 
 export function parseFiltersFromHash() {
   const hash = location.hash.slice(1);
@@ -26,14 +29,12 @@ export function syncFiltersToUrl(filters) {
   }
   const qs = params.toString();
   const next = qs ? `#${path}?${qs}` : `#${path}`;
-  if (location.hash !== next) {
-    history.replaceState(null, '', next);
-  }
+  if (location.hash !== next) history.replaceState(null, '', next);
 }
 
 export function applyFiltersFromUrl() {
   const parsed = parseFiltersFromHash();
-  if (parsed) updateFilters(parsed);
+  if (parsed) updateFilters(parsed, { preset: 'custom' });
 }
 
 export function buildShareUrl(filters) {

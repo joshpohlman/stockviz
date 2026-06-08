@@ -1,20 +1,11 @@
 import './style.css';
 import { fetchAllQuotes, fetchMarketStatus } from './api.js';
 import {
-  getSettings,
-  getQuotes,
-  getMeta,
-  getMarketStatus,
-  setQuotes,
-  setMarketStatus,
-  subscribe,
-  startPolling,
-  stopPolling,
-  setSelectedSymbol,
-  toggleTheme,
-  applyTheme,
+  getSettings, getQuotes, getMeta, getMarketStatus,
+  setQuotes, setMarketStatus, subscribe, startPolling, stopPolling,
+  setSelectedSymbol, toggleTheme, applyTheme,
 } from './store.js';
-import { INDICES, UNIVERSE } from './data/universe.js';
+import { UNIVERSE } from './data/universe.js';
 import { fmtPrice, fmtPct, changeClass, fmtTime } from './utils/format.js';
 import { patchLivePrices } from './utils/livePatch.js';
 import { initQuotePanel, openQuotePanel } from './components/quotePanel.js';
@@ -26,6 +17,13 @@ import { renderMap } from './pages/map.js';
 import { renderNews } from './pages/news.js';
 import { renderPortfolio } from './pages/portfolio.js';
 import { renderCompare } from './pages/compare.js';
+import { renderSignals } from './pages/signals.js';
+import { renderPatterns } from './pages/patterns.js';
+import { renderGroups } from './pages/groups.js';
+import { renderCharts } from './pages/charts.js';
+import { renderFutures } from './pages/futures.js';
+import { renderCalendar } from './pages/calendar.js';
+import { renderInsider } from './pages/insider.js';
 import { renderSettings } from './pages/settings.js';
 import { applyFiltersFromUrl } from './utils/urlState.js';
 import { drawSparkline } from './utils/sparkline.js';
@@ -37,6 +35,13 @@ const routes = {
   '/news': renderNews,
   '/portfolio': renderPortfolio,
   '/compare': renderCompare,
+  '/signals': renderSignals,
+  '/patterns': renderPatterns,
+  '/groups': renderGroups,
+  '/charts': renderCharts,
+  '/futures': renderFutures,
+  '/calendar': renderCalendar,
+  '/insider': renderInsider,
   '/settings': renderSettings,
 };
 
@@ -76,7 +81,7 @@ function updateStatus(source) {
     text.textContent = 'Live · Finnhub';
   } else {
     dot.className = 'status-dot mock';
-    text.textContent = 'Simulated data';
+    text.textContent = 'Simulated + TA Engine';
   }
 
   if (meta.lastFetchAt) last.textContent = `Updated ${fmtTime(meta.lastFetchAt)}`;
@@ -84,7 +89,6 @@ function updateStatus(source) {
     market.textContent = mkt.label;
     market.className = `market-status ${mkt.isOpen ? 'open' : 'closed'}`;
   }
-
   updateFooterStats();
 }
 
@@ -93,27 +97,26 @@ function updateFooterStats() {
   if (!el) return;
   const quotes = getQuotes();
   const rows = [...quotes.values()];
-  const avg = rows.length ? rows.reduce((s, q) => s + q.changePct, 0) / rows.length : 0;
-  const up = rows.filter((q) => q.changePct > 0).length;
-  const down = rows.filter((q) => q.changePct < 0).length;
+  const patterns = rows.reduce((s, q) => s + (q.patterns?.length || 0), 0);
+  const bullish = rows.filter((q) => q.prediction?.direction === 'bullish').length;
   el.innerHTML = `
     <span>${UNIVERSE.length} symbols</span>
-    <span class="${changeClass(avg)}">Avg ${fmtPct(avg)}</span>
-    <span class="pos">${up} up</span>
-    <span class="neg">${down} down</span>
+    <span>${patterns} patterns</span>
+    <span class="pos">${bullish} bullish</span>
   `;
 }
 
 function renderTickerBar() {
   const bar = document.getElementById('ticker-bar');
   const quotes = getQuotes();
-  bar.innerHTML = INDICES.map(({ symbol, label }) => {
+  bar.innerHTML = ['SPY', 'QQQ', 'DIA', 'IWM'].map((symbol) => {
+    const labels = { SPY: 'S&P 500', QQQ: 'NASDAQ', DIA: 'DOW', IWM: 'RUSSELL 2K' };
     const q = quotes.get(symbol);
     if (!q) return '';
     const cls = changeClass(q.changePct);
     return `
       <span class="ticker-item" data-live-symbol="${symbol}">
-        <span class="ticker-label">${label}</span>
+        <span class="ticker-label">${labels[symbol]}</span>
         <span class="ticker-price" data-live="price">$${fmtPrice(q.price)}</span>
         <span class="ticker-chg ${cls}" data-live="pct">${fmtPct(q.changePct)}</span>
       </span>
@@ -132,16 +135,16 @@ function paintSparklines() {
   document.querySelectorAll('canvas[data-spark]').forEach((canvas) => {
     const q = getQuotes().get(canvas.dataset.spark);
     if (q?.sparkline?.length) {
-      const w = Number(canvas.getAttribute('width')) || 72;
-      const h = Number(canvas.getAttribute('height')) || 24;
-      drawSparkline(canvas, q.sparkline, { width: w, height: h });
+      drawSparkline(canvas, q.sparkline, {
+        width: Number(canvas.getAttribute('width')) || 72,
+        height: Number(canvas.getAttribute('height')) || 24,
+      });
     }
   });
 }
 
 function getRoutePath() {
-  const hash = location.hash.slice(1) || '/';
-  return hash.split('?')[0] || '/';
+  return (location.hash.slice(1) || '/').split('?')[0] || '/';
 }
 
 function navigate(animate = true) {
@@ -159,9 +162,7 @@ function navigate(animate = true) {
   const after = () => {
     renderTickerBar();
     paintSparklines();
-    if (animate) {
-      requestAnimationFrame(() => main.classList.remove('page-enter'));
-    }
+    if (animate) requestAnimationFrame(() => main.classList.remove('page-enter'));
     isFirstLoad = false;
   };
   if (result?.then) result.then(after);
@@ -182,49 +183,26 @@ function onStoreChange(reason) {
   else renderTickerBar();
 }
 
-function initMobileNav() {
-  const toggle = document.getElementById('nav-toggle');
-  const nav = document.querySelector('.main-nav');
-  toggle?.addEventListener('click', () => {
-    const open = nav?.classList.toggle('open');
-    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-  });
-}
-
-function initThemeToggle() {
-  document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
-  applyTheme(getSettings().theme);
-}
-
 function boot() {
   initQuotePanel();
   initCommandPalette();
   initToast();
-  initMobileNav();
-  initThemeToggle();
+  document.getElementById('nav-toggle')?.addEventListener('click', () => {
+    document.querySelector('.main-nav')?.classList.toggle('open');
+  });
+  document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
+  applyTheme(getSettings().theme);
   applyFiltersFromUrl();
 
-  window.addEventListener('hashchange', () => {
-    applyFiltersFromUrl();
-    navigate();
-  });
-
-  window.addEventListener('stockviz:select', (e) => {
-    setSelectedSymbol(e.detail);
-    openQuotePanel(e.detail);
-  });
-
+  window.addEventListener('hashchange', () => { applyFiltersFromUrl(); navigate(); });
+  window.addEventListener('stockviz:select', (e) => { setSelectedSymbol(e.detail); openQuotePanel(e.detail); });
   window.addEventListener('stockviz:settings-saved', () => {
     stopPolling();
     refreshQuotes().then(() => startPolling(refreshQuotes));
   });
 
   subscribe(onStoreChange);
-
-  refreshQuotes().then(() => {
-    navigate();
-    startPolling(refreshQuotes);
-  });
+  refreshQuotes().then(() => { navigate(); startPolling(refreshQuotes); });
 }
 
 boot();

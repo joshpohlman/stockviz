@@ -1,65 +1,49 @@
 # StockViz
 
-A Finviz-inspired stock screener you can customize and extend — with heat maps, portfolio tracking, live sparklines, and buttery-smooth price updates.
+Finviz-style stock screener with **pattern prediction**, technical signals, heat maps, and real-time data.
 
 **Live:** https://joshpohlman.github.io/stockviz/
 
-## Highlights
+## Finviz-Style Features
 
-- **240+ US stocks** across all 11 sectors
-- **Live price patching** — updates tick without full page re-render
-- **Sparklines** on watchlist, screener, and compare views
-- **Command palette** — press `/` or `Ctrl+K` to jump to any ticker
-- **Portfolio** — track shares, cost basis, live P&L
-- **Compare** — side-by-side up to 4 stocks
-- **Screener** — 11 presets, favorites (★), CSV export, shareable filter URLs
-- **Heat map** — live-updating sector treemap
-- **News** — market headlines + per-stock news in quote panel
-- **Dark / light theme** — toggle with ◐ in the header
-- **Quote panel** — 60-day chart, news, favorite & compare actions
+| Page | What it does |
+|------|----------------|
+| **Home** | Market breadth, gainers/losers, heat map preview, headlines, top predictions |
+| **Screener** | Tabbed filters (Descriptive, Fundamental, Technical, Signals) + 15 presets |
+| **Signals** | Top Gainers, Overbought, Golden Cross, Unusual Volume, etc. |
+| **Patterns** | Double Top/Bottom, H&S, Wedges, Channels — with confidence % |
+| **Charts** | Full-screen candlestick charts + prediction overlay |
+| **Map** | Sector heat map (live-updating) |
+| **Groups** | Sector performance rankings |
+| **Portfolio** | Holdings + live P&L |
+| **Compare** | Side-by-side up to 4 stocks |
+| **Insider** | Insider trading feed |
+| **Futures** | Futures, forex, bonds |
+| **Calendar** | Earnings + economic events |
+| **News** | Market headlines |
+
+## Pattern Prediction Engine
+
+Every stock is analyzed with:
+- **RSI, SMA20/50/200, MACD, ATR, Bollinger Bands**
+- **14 chart patterns** (Double Top, Head & Shoulders, Wedges, Channels…)
+- **11 technical signals** (Overbought, Golden Cross, New High…)
+- **Multi-factor prediction** — bullish/bearish/neutral with confidence % and price target
+
+Click any ticker → **AI Pattern Prediction** panel with factor breakdown.
 
 ## Quick Start
 
 ```bash
-cd stockviz
-npm install
-npm run dev
+npm install && npm run dev
 ```
 
-## Real-Time Data
-
-1. Free API key: [finnhub.io/register](https://finnhub.io/register)
-2. **Settings** → paste key → Test → Save
-3. Auto-refresh every 30s (configurable)
-
-Without a key, **simulated live data** runs out of the box.
-
-## Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `/` or `Ctrl+K` | Open stock search |
-| `Esc` | Close quote panel / search |
-
-## Customize
-
-| What | File |
-|------|------|
-| Stock universe | `src/data/universe.js` |
-| Screener presets | `src/data/presets.js` |
-| Theme & colors | `src/style.css` |
-| API layer | `src/api.js` |
+Add a free [Finnhub API key](https://finnhub.io/register) in Settings for live quotes.
 
 ## Deploy
 
 ```bash
 npm run deploy:pages
 ```
-
-Or push to `main` — GitHub Actions deploys automatically.
-
-## Stack
-
-Vite · Vanilla JS · Finnhub API · Canvas charts · Zero frameworks
 
 MIT

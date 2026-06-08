@@ -4,7 +4,7 @@ import {
   deleteSavedFilter, loadSavedFilter, toggleFavorite, isFavorite,
 } from '../store.js';
 import { SECTORS } from '../data/universe.js';
-import { PRESETS } from '../data/presets.js';
+import { PRESETS, SIGNAL_GROUPS, PATTERN_GROUPS } from '../data/presets.js';
 import { fmtPrice, fmtPct, fmtVolume, fmtMarketCap, changeClass } from '../utils/format.js';
 import { applyFiltersFromQuotes } from './screenerFilters.js';
 import { exportToCsv } from '../utils/export.js';
@@ -44,42 +44,42 @@ export function renderScreener(container) {
       `).join('')}
     </div>
 
+    <div class="screener-tabs">
+      <button type="button" class="screener-tab active" data-tab="all">All</button>
+      <button type="button" class="screener-tab" data-tab="desc">Descriptive</button>
+      <button type="button" class="screener-tab" data-tab="fund">Fundamental</button>
+      <button type="button" class="screener-tab" data-tab="tech">Technical</button>
+      <button type="button" class="screener-tab" data-tab="signals">Signals</button>
+    </div>
+
     <form class="filter-bar" id="filter-form">
-      <div class="filter-group">
-        <label>Search</label>
-        <input type="search" name="search" placeholder="Symbol or name…" value="${esc(filters.search)}" />
+      <div class="filter-panel" data-panel="all">
+        <div class="filter-group"><label>Search</label><input type="search" name="search" placeholder="Symbol…" value="${esc(filters.search)}" /></div>
       </div>
-      <div class="filter-group">
-        <label>Sector</label>
-        <select name="sector">
-          <option value="">All Sectors</option>
-          ${SECTORS.map((s) => `<option value="${s}" ${filters.sector === s ? 'selected' : ''}>${s}</option>`).join('')}
-        </select>
+      <div class="filter-panel" data-panel="desc" hidden>
+        <div class="filter-group"><label>Sector</label><select name="sector"><option value="">Any</option>${SECTORS.map((s) => `<option value="${s}" ${filters.sector === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+        <div class="filter-group"><label>Min %</label><input type="number" name="minChange" step="0.1" value="${esc(filters.minChange)}" /></div>
+        <div class="filter-group"><label>Max %</label><input type="number" name="maxChange" step="0.1" value="${esc(filters.maxChange)}" /></div>
+        <div class="filter-group"><label>Min Vol</label><input type="number" name="minVolume" value="${esc(filters.minVolume)}" /></div>
+        <div class="filter-group"><label>Min MCap</label><select name="minMarketCap"><option value="">Any</option><option value="10000000000" ${filters.minMarketCap === '10000000000' ? 'selected' : ''}>$10B+</option><option value="50000000000" ${filters.minMarketCap === '50000000000' ? 'selected' : ''}>$50B+</option><option value="100000000000" ${filters.minMarketCap === '100000000000' ? 'selected' : ''}>$100B+</option></select></div>
       </div>
-      <div class="filter-group">
-        <label>Min %</label>
-        <input type="number" name="minChange" step="0.1" placeholder="-10" value="${esc(filters.minChange)}" />
+      <div class="filter-panel" data-panel="fund" hidden>
+        <div class="filter-group"><label>Min P/E</label><input type="number" name="minPe" value="${esc(filters.minPe)}" /></div>
+        <div class="filter-group"><label>Max P/E</label><input type="number" name="maxPe" value="${esc(filters.maxPe)}" /></div>
       </div>
-      <div class="filter-group">
-        <label>Max %</label>
-        <input type="number" name="maxChange" step="0.1" placeholder="10" value="${esc(filters.maxChange)}" />
+      <div class="filter-panel" data-panel="tech" hidden>
+        <div class="filter-group"><label>Min RSI</label><input type="number" name="minRsi" value="${esc(filters.minRsi)}" /></div>
+        <div class="filter-group"><label>Max RSI</label><input type="number" name="maxRsi" value="${esc(filters.maxRsi)}" /></div>
+        <div class="filter-group"><label>Above SMA50</label><select name="aboveSma50"><option value="">Any</option><option value="yes" ${filters.aboveSma50 === 'yes' ? 'selected' : ''}>Yes</option><option value="no" ${filters.aboveSma50 === 'no' ? 'selected' : ''}>No</option></select></div>
+        <div class="filter-group"><label>Above SMA200</label><select name="aboveSma200"><option value="">Any</option><option value="yes" ${filters.aboveSma200 === 'yes' ? 'selected' : ''}>Yes</option><option value="no" ${filters.aboveSma200 === 'no' ? 'selected' : ''}>No</option></select></div>
+        <div class="filter-group"><label>Prediction</label><select name="prediction"><option value="">Any</option><option value="bullish" ${filters.prediction === 'bullish' ? 'selected' : ''}>Bullish</option><option value="bearish" ${filters.prediction === 'bearish' ? 'selected' : ''}>Bearish</option><option value="neutral" ${filters.prediction === 'neutral' ? 'selected' : ''}>Neutral</option></select></div>
       </div>
-      <div class="filter-group">
-        <label>Min Vol</label>
-        <input type="number" name="minVolume" step="100000" placeholder="1M" value="${esc(filters.minVolume)}" />
-      </div>
-      <div class="filter-group">
-        <label>Min MCap</label>
-        <select name="minMarketCap">
-          <option value="">Any</option>
-          <option value="10000000000" ${filters.minMarketCap === '10000000000' ? 'selected' : ''}>$10B+</option>
-          <option value="50000000000" ${filters.minMarketCap === '50000000000' ? 'selected' : ''}>$50B+</option>
-          <option value="100000000000" ${filters.minMarketCap === '100000000000' ? 'selected' : ''}>$100B+</option>
-          <option value="500000000000" ${filters.minMarketCap === '500000000000' ? 'selected' : ''}>$500B+</option>
-        </select>
+      <div class="filter-panel" data-panel="signals" hidden>
+        <div class="filter-group"><label>Signal</label><select name="signal"><option value="">Any</option>${SIGNAL_GROUPS.map((s) => `<option value="${s.id}" ${filters.signal === s.id ? 'selected' : ''}>${s.label}</option>`).join('')}</select></div>
+        <div class="filter-group"><label>Pattern</label><select name="pattern"><option value="">Any</option>${PATTERN_GROUPS.map((p) => `<option value="${p.id}" ${filters.pattern === p.id ? 'selected' : ''}>${p.label}</option>`).join('')}</select></div>
       </div>
       <button type="button" class="btn-ghost" id="reset-filters">Reset</button>
-      <button type="button" class="btn-ghost" id="save-filter">Save Preset</button>
+      <button type="button" class="btn-ghost" id="save-filter">Save</button>
     </form>
 
     ${saved.length ? `
@@ -103,12 +103,16 @@ export function renderScreener(container) {
             ${sortHeader('sector', 'Sector', sort)}
             ${sortHeader('price', 'Price', sort)}
             ${sortHeader('changePct', 'Change %', sort)}
+            <th>Signal</th><th>Pattern</th>
+            ${sortHeader('ta.rsi', 'RSI', sort)}
+            <th>P/E</th>
+            <th>Prediction</th>
             ${sortHeader('volume', 'Volume', sort)}
             ${sortHeader('marketCap', 'Market Cap', sort)}
           </tr>
         </thead>
         <tbody>
-          ${sorted.length ? sorted.map(renderRow).join('') : '<tr><td colspan="9" class="empty-row">No matches — adjust filters</td></tr>'}
+          ${sorted.length ? sorted.map(renderRow).join('') : '<tr><td colspan="13" class="empty-row">No matches — adjust filters</td></tr>'}
         </tbody>
       </table>
     </div>
@@ -175,6 +179,17 @@ export function renderScreener(container) {
     });
   });
 
+  container.querySelectorAll('.screener-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      container.querySelectorAll('.screener-tab').forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+      const id = tab.dataset.tab;
+      container.querySelectorAll('.filter-panel').forEach((p) => {
+        p.hidden = p.dataset.panel !== id;
+      });
+    });
+  });
+
   container.querySelectorAll('[data-fav]').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -203,17 +218,27 @@ function renderRow(q) {
       <td class="sector-cell">${q.sector || '—'}</td>
       <td data-live="price">$${fmtPrice(q.price)}</td>
       <td class="${changeClass(q.changePct)}" data-live="pct">${fmtPct(q.changePct)}</td>
+      <td class="signal-tag">${q.primarySignal || '—'}</td>
+      <td class="pattern-label">${q.patternLabels?.[0] || '—'}</td>
+      <td class="${(q.ta?.rsi ?? 50) > 70 ? 'neg' : (q.ta?.rsi ?? 50) < 30 ? 'pos' : ''}">${q.ta?.rsi?.toFixed(1) ?? '—'}</td>
+      <td>${q.fundamentals?.pe ?? '—'}</td>
+      <td class="${q.prediction?.direction === 'bullish' ? 'pos' : q.prediction?.direction === 'bearish' ? 'neg' : ''}">${q.prediction ? `${q.prediction.direction} ${q.prediction.confidence}%` : '—'}</td>
       <td>${fmtVolume(q.volume)}</td>
       <td>${fmtMarketCap(q.marketCap)}</td>
     </tr>
   `;
 }
 
+function getNested(obj, key) {
+  if (key.includes('.')) return key.split('.').reduce((o, k) => o?.[k], obj);
+  return obj[key];
+}
+
 function applySort(rows, { key, dir }) {
   const mul = dir === 'asc' ? 1 : -1;
   return [...rows].sort((a, b) => {
-    const av = a[key] ?? '';
-    const bv = b[key] ?? '';
+    const av = getNested(a, key) ?? '';
+    const bv = getNested(b, key) ?? '';
     if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * mul;
     return String(av).localeCompare(String(bv)) * mul;
   });

@@ -1,163 +1,167 @@
-import { getQuotes, getSettings, getMarketStatus } from '../store.js';
+import { getQuotes, getSettings } from '../store.js';
+import { getMarketBreadth } from '../analysis/enrich.js';
 import { fmtPrice, fmtPct, fmtVolume, changeClass } from '../utils/format.js';
-import { SECTORS, UNIVERSE } from '../data/universe.js';
-import { sparklineHtml } from '../utils/sparkline.js';
+import { SIGNAL_GROUPS, PATTERN_GROUPS } from '../data/marketData.js';
+import { fetchMarketNews } from '../api.js';
 
-export function renderHome(container) {
+export async function renderHome(container) {
   const quotes = getQuotes();
   const settings = getSettings();
-  const market = getMarketStatus();
-  const rows = [...quotes.values()].filter((q) => q.changePct != null);
+  const rows = [...quotes.values()];
+  const breadth = getMarketBreadth(quotes);
 
-  const gainers = [...rows].sort((a, b) => b.changePct - a.changePct).slice(0, 10);
-  const losers = [...rows].sort((a, b) => a.changePct - b.changePct).slice(0, 10);
-  const active = [...rows].sort((a, b) => (b.volume || 0) - (a.volume || 0)).slice(0, 10);
+  const gainers = rows.filter((q) => q.signals?.some((s) => s.id === 'top_gainers'))
+    .sort((a, b) => b.changePct - a.changePct).slice(0, 7);
+  const losers = rows.filter((q) => q.signals?.some((s) => s.id === 'top_losers'))
+    .sort((a, b) => a.changePct - b.changePct).slice(0, 7);
 
-  const avgChange = rows.length ? rows.reduce((s, x) => s + x.changePct, 0) / rows.length : 0;
-  const advancers = rows.filter((r) => r.changePct > 0).length;
-  const decliners = rows.filter((r) => r.changePct < 0).length;
+  const news = await fetchMarketNews(settings).catch(() => []);
 
-  const sectorStats = SECTORS.map((sector) => {
-    const inSector = rows.filter((r) => r.sector === sector);
-    if (!inSector.length) return null;
-    const avg = inSector.reduce((s, x) => s + x.changePct, 0) / inSector.length;
-    return { sector, avg, count: inSector.length };
-  }).filter(Boolean);
-
-  const watchlist = settings.watchlist.map((sym) => quotes.get(sym)).filter(Boolean);
+  const patternCols = PATTERN_GROUPS.slice(0, 6).map((pg) => {
+    const match = rows.find((q) => q.patterns?.some((p) => p.id === pg.id));
+    return { ...pg, stock: match };
+  });
 
   container.innerHTML = `
-    <div class="hero-banner panel">
-      <div class="hero-stat">
-        <span class="hero-label">Universe</span>
-        <span class="hero-value">${UNIVERSE.length}</span>
-        <span class="hero-sub">tracked symbols</span>
-      </div>
-      <div class="hero-stat">
-        <span class="hero-label">Market</span>
-        <span class="hero-value ${market?.isOpen ? 'pos' : ''}">${market?.isOpen ? 'OPEN' : 'CLOSED'}</span>
-        <span class="hero-sub">${market?.label || '—'}</span>
-      </div>
-      <div class="hero-stat">
-        <span class="hero-label">Breadth</span>
-        <span class="hero-value"><span class="pos">${advancers}</span> / <span class="neg">${decliners}</span></span>
-        <span class="hero-sub">advancers / decliners</span>
-      </div>
-      <div class="hero-stat">
-        <span class="hero-label">Avg Change</span>
-        <span class="hero-value ${changeClass(avgChange)}">${fmtPct(avgChange)}</span>
-        <span class="hero-sub">across universe</span>
-      </div>
-      <div class="hero-hint">
-        Press <kbd>/</kbd> or <kbd>Ctrl+K</kbd> to jump to any ticker
-      </div>
-    </div>
-
-    <section class="panel stagger-in">
-      <h2 class="panel-title">Watchlist</h2>
-      <div class="card-grid">
-        ${watchlist.length ? watchlist.map(renderWatchCard).join('') : '<p class="muted">Add symbols in Settings → Watchlist</p>'}
-      </div>
-    </section>
-
-    <div class="two-col">
-      <section class="panel stagger-in">
-        <h2 class="panel-title pos-title">Top Gainers</h2>
-        ${renderMoverTable(gainers)}
-      </section>
-      <section class="panel stagger-in">
-        <h2 class="panel-title neg-title">Top Losers</h2>
-        ${renderMoverTable(losers)}
-      </section>
-    </div>
-
-    <div class="two-col">
-      <section class="panel stagger-in">
-        <h2 class="panel-title">Most Active</h2>
-        ${renderActiveTable(active)}
-      </section>
-      <section class="panel stagger-in">
-        <h2 class="panel-title">Sector Performance</h2>
-        <div class="sector-bars">
-          ${sectorStats.map(renderSectorBar).join('')}
+    <div class="finviz-home">
+      <!-- Market breadth bar -->
+      <div class="breadth-bar panel">
+        <div class="breadth-item">
+          <span class="breadth-label">Advancing</span>
+          <span class="breadth-val pos">${breadth.advPct.toFixed(1)}%</span>
+          <span class="breadth-sub">(${breadth.advancing})</span>
         </div>
-      </section>
+        <div class="breadth-item">
+          <span class="breadth-label">Declining</span>
+          <span class="breadth-val neg">${breadth.decPct.toFixed(1)}%</span>
+          <span class="breadth-sub">(${breadth.declining})</span>
+        </div>
+        <div class="breadth-item">
+          <span class="breadth-label">Above SMA50</span>
+          <span class="breadth-val">${breadth.aboveSma50Pct.toFixed(1)}%</span>
+          <span class="breadth-sub">(${breadth.aboveSma50})</span>
+        </div>
+        <div class="breadth-item">
+          <span class="breadth-label">Above SMA200</span>
+          <span class="breadth-val">${breadth.aboveSma200Pct.toFixed(1)}%</span>
+          <span class="breadth-sub">(${breadth.aboveSma200})</span>
+        </div>
+        <div class="breadth-item">
+          <span class="breadth-label">New High / Low</span>
+          <span class="breadth-val"><span class="pos">${breadth.newHigh}</span> / <span class="neg">${breadth.newLow}</span></span>
+        </div>
+      </div>
+
+      <div class="finviz-cols">
+        <!-- Left: Gainers -->
+        <section class="panel finviz-col">
+          <h2 class="finviz-col-title pos-title">Top Gainers</h2>
+          ${renderSignalTable(gainers, 'Top Gainers')}
+        </section>
+
+        <!-- Center-left: Losers -->
+        <section class="panel finviz-col">
+          <h2 class="finviz-col-title neg-title">Top Losers</h2>
+          ${renderSignalTable(losers, 'Top Losers')}
+        </section>
+
+        <!-- Center: Heat map link + patterns -->
+        <section class="panel finviz-col finviz-col-map">
+          <h2 class="finviz-col-title"><a href="#/map">S&amp;P 500 — Heat Map</a></h2>
+          <a href="#/map" class="map-preview">
+            <div class="map-preview-grid">
+              ${rows.slice(0, 24).map((q) => `
+                <span class="map-preview-tile" style="background:${heat(q.changePct)}" title="${q.symbol} ${fmtPct(q.changePct)}"></span>
+              `).join('')}
+            </div>
+          </a>
+          <h3 class="finviz-sub-title">Pattern Signals</h3>
+          <table class="data-table compact finviz-tbl">
+            <tbody>
+              ${patternCols.map((pg) => pg.stock ? `
+                <tr class="clickable" data-symbol="${pg.stock.symbol}">
+                  <td class="sym">${pg.stock.symbol}</td>
+                  <td class="signal-tag">${pg.label}</td>
+                </tr>
+              ` : '').join('')}
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Right: News + predictions -->
+        <section class="panel finviz-col finviz-col-news">
+          <h2 class="finviz-col-title"><a href="#/news">Headlines</a></h2>
+          <div class="headline-list">
+            ${news.slice(0, 8).map((n) => `
+              <a class="headline-item" href="${n.url || '#'}" target="_blank" rel="noopener">
+                <span class="headline-time">${n.datetime ? new Date(n.datetime * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                <span class="headline-text">${n.headline || n.title}</span>
+              </a>
+            `).join('')}
+          </div>
+          <h3 class="finviz-sub-title"><a href="#/patterns">Top Predictions</a></h3>
+          <table class="data-table compact finviz-tbl">
+            <tbody>
+              ${rows.filter((q) => q.prediction?.confidence >= 65)
+                .sort((a, b) => b.prediction.confidence - a.prediction.confidence)
+                .slice(0, 6).map((q) => `
+                <tr class="clickable" data-symbol="${q.symbol}">
+                  <td class="sym">${q.symbol}</td>
+                  <td class="${q.prediction.direction === 'bullish' ? 'pos' : q.prediction.direction === 'bearish' ? 'neg' : ''}">${q.prediction.direction}</td>
+                  <td>${q.prediction.confidence}%</td>
+                  <td>$${fmtPrice(q.prediction.priceTarget)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </section>
+      </div>
+
+      <!-- Signal ticker rows -->
+      <div class="signal-ticker-row panel">
+        <span class="signal-ticker-label">Signals:</span>
+        ${SIGNAL_GROUPS.slice(0, 10).map((sg) => {
+          const n = rows.filter((q) => q.signals?.some((s) => s.id === sg.id)).length;
+          return `<a href="#/screener?signal=${sg.id}" class="signal-ticker-chip">${sg.label} (${n})</a>`;
+        }).join('')}
+        <a href="#/signals" class="signal-ticker-chip accent">All Signals →</a>
+        <a href="#/patterns" class="signal-ticker-chip accent">Pattern Scanner →</a>
+      </div>
     </div>
   `;
 
-  bindClicks(container);
-}
-
-function bindClicks(container) {
   container.querySelectorAll('[data-symbol]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.preventDefault();
+    el.addEventListener('click', () => {
       window.dispatchEvent(new CustomEvent('stockviz:select', { detail: el.dataset.symbol }));
     });
   });
 }
 
-function renderWatchCard(q) {
-  const cls = changeClass(q.changePct);
+function renderSignalTable(rows, signalLabel) {
   return `
-    <button class="watch-card" data-live-symbol="${q.symbol}" data-symbol="${q.symbol}">
-      <div class="watch-card-top">
-        <span class="watch-sym">${q.symbol}</span>
-        ${sparklineHtml(q.symbol)}
-      </div>
-      <span class="watch-price" data-live="price">$${fmtPrice(q.price)}</span>
-      <span class="watch-chg ${cls}" data-live="pct">${fmtPct(q.changePct)}</span>
-    </button>
-  `;
-}
-
-function renderMoverTable(rows) {
-  return `
-    <table class="data-table compact">
-      <thead><tr><th>Ticker</th><th>Spark</th><th>Price</th><th>%</th></tr></thead>
+    <table class="data-table compact finviz-tbl">
+      <thead><tr><th>Ticker</th><th>Last</th><th>Change</th><th>Vol</th><th>Signal</th></tr></thead>
       <tbody>
-        ${rows.map((q) => `
+        ${rows.length ? rows.map((q) => `
           <tr class="clickable" data-live-symbol="${q.symbol}" data-symbol="${q.symbol}">
             <td class="sym">${q.symbol}</td>
-            <td>${sparklineHtml(q.symbol)}</td>
             <td data-live="price">$${fmtPrice(q.price)}</td>
             <td class="${changeClass(q.changePct)}" data-live="pct">${fmtPct(q.changePct)}</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-  `;
-}
-
-function renderActiveTable(rows) {
-  return `
-    <table class="data-table compact">
-      <thead><tr><th>Ticker</th><th>Volume</th><th>Price</th><th>%</th></tr></thead>
-      <tbody>
-        ${rows.map((q) => `
-          <tr class="clickable" data-live-symbol="${q.symbol}" data-symbol="${q.symbol}">
-            <td class="sym">${q.symbol}</td>
             <td>${fmtVolume(q.volume)}</td>
-            <td data-live="price">$${fmtPrice(q.price)}</td>
-            <td class="${changeClass(q.changePct)}" data-live="pct">${fmtPct(q.changePct)}</td>
+            <td><a href="#/screener" class="signal-link">${signalLabel}</a></td>
           </tr>
-        `).join('')}
+        `).join('') : '<tr><td colspan="5" class="empty-row">—</td></tr>'}
       </tbody>
     </table>
   `;
 }
 
-function renderSectorBar({ sector, avg, count }) {
-  const cls = changeClass(avg);
-  const width = Math.min(100, Math.abs(avg) * 15 + 10);
-  return `
-    <div class="sector-bar-row">
-      <span class="sector-bar-label">${sector}</span>
-      <div class="sector-bar-track">
-        <div class="sector-bar-fill ${cls}" style="width:${width}%"></div>
-      </div>
-      <span class="sector-bar-val ${cls}">${fmtPct(avg)}</span>
-      <span class="sector-bar-count">${count}</span>
-    </div>
-  `;
+function heat(pct) {
+  const clamped = Math.max(-5, Math.min(5, pct ?? 0));
+  if (clamped >= 0) {
+    const t = clamped / 5;
+    return `rgb(${20 + (1 - t) * 30},${80 + t * 120},${40 + (1 - t) * 20})`;
+  }
+  const t = Math.abs(clamped) / 5;
+  return `rgb(${120 + t * 135},${40 + (1 - t) * 30},${40})`;
 }

@@ -8,11 +8,21 @@ const DEFAULT_SETTINGS = {
 
 const DEFAULT_FILTERS = {
   sector: '',
+  industry: '',
   minChange: '',
   maxChange: '',
   minVolume: '',
   minMarketCap: '',
   search: '',
+  signal: '',
+  pattern: '',
+  prediction: '',
+  minRsi: '',
+  maxRsi: '',
+  minPe: '',
+  maxPe: '',
+  aboveSma50: '',
+  aboveSma200: '',
 };
 
 let settings = loadSettings();

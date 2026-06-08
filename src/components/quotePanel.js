@@ -1,5 +1,5 @@
 import { fetchSingleQuote, fetchCandles, fetchCompanyNews } from '../api.js';
-import { getSettings, setSelectedSymbol, toggleFavorite, isFavorite, toggleCompare, getCompareList } from '../store.js';
+import { getSettings, getQuotes, setSelectedSymbol, toggleFavorite, isFavorite, toggleCompare, getCompareList } from '../store.js';
 import { fmtPrice, fmtChange, fmtPct, fmtVolume, fmtMarketCap, changeClass } from '../utils/format.js';
 import { renderPriceChart } from './chart.js';
 import { toast } from './toast.js';
@@ -40,11 +40,13 @@ export function closeQuotePanel() {
 
 async function loadQuote(symbol) {
   const settings = getSettings();
-  const [quote, candles, news] = await Promise.all([
-    fetchSingleQuote(symbol, settings),
-    fetchCandles(symbol, settings),
+  const cached = getQuotes().get(symbol);
+  const [fetched, news] = await Promise.all([
+    cached?.prediction ? Promise.resolve(cached) : fetchSingleQuote(symbol, settings),
     fetchCompanyNews(symbol, settings),
   ]);
+  const quote = fetched;
+  const candles = quote?.candles || await fetchCandles(symbol, settings);
 
   if (!quote) {
     bodyEl.innerHTML = '<p class="quote-error">Could not load quote.</p>';
@@ -81,6 +83,30 @@ async function loadQuote(symbol) {
       <div class="quote-stat"><span class="label">Sector</span><span class="value">${quote.sector || '—'}</span></div>
       <div class="quote-stat"><span class="label">Industry</span><span class="value">${quote.industry || '—'}</span></div>
     </div>
+    ${quote.prediction ? `
+    <div class="prediction-panel panel">
+      <h3 class="quote-section-title">AI Pattern Prediction</h3>
+      <div class="pred-header">
+        <span class="pred-badge ${quote.prediction.direction}">${quote.prediction.direction.toUpperCase()}</span>
+        <span class="pred-conf">${quote.prediction.confidence}% confidence</span>
+        <span class="pred-horizon">${quote.prediction.horizon}</span>
+      </div>
+      <div class="pred-target">
+        Target: <strong>$${fmtPrice(quote.prediction.priceTarget)}</strong>
+        <span class="${changeClass(quote.prediction.targetPct)}">(${quote.prediction.targetPct >= 0 ? '+' : ''}${quote.prediction.targetPct}%)</span>
+      </div>
+      <div class="pred-factors">
+        ${(quote.prediction.factors || []).map((f) => `
+          <div class="pred-factor ${f.weight}">
+            <span>${f.name}</span>
+            <span class="${f.score >= 0 ? 'pos' : 'neg'}">${f.score >= 0 ? '+' : ''}${Math.round(f.score)}</span>
+          </div>
+        `).join('')}
+      </div>
+      ${quote.patterns?.length ? `<p class="pred-patterns"><strong>Patterns:</strong> ${quote.patterns.map((p) => `${p.label} (${p.confidence}%)`).join(' · ')}</p>` : ''}
+      <p class="pred-disclaimer">Technical analysis estimate — not financial advice.</p>
+    </div>
+    ` : ''}
     <div class="quote-chart-section">
       <h3 class="quote-section-title">Price Chart (60D)</h3>
       <div id="quote-chart" class="quote-chart-host"></div>

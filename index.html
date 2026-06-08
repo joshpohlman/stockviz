@@ -4,80 +4,69 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Finviz-style stock screener with heat maps, portfolio tracking, real-time quotes, and customizable filters." />
-    <meta name="theme-color" content="#0d1117" />
-    <title>StockViz — Stock Screener & Heat Map</title>
+    <meta name="description" content="Finviz-style stock screener with pattern prediction, technical signals, heat maps, and real-time data." />
+    <title>StockViz — Stock Screener & Pattern Prediction</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="app">
-      <header class="site-header">
+      <header class="site-header finviz-header">
         <div class="header-inner">
           <a href="#/" class="logo">
             <span class="logo-mark">SV</span>
             <span class="logo-text">Stock<span class="accent">Viz</span></span>
           </a>
-          <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
-            <span></span><span></span><span></span>
-          </button>
-          <nav class="main-nav" aria-label="Main">
-            <a href="#/" data-route="home">Home</a>
-            <a href="#/screener" data-route="screener">Screener</a>
-            <a href="#/map" data-route="map">Heat Map</a>
-            <a href="#/portfolio" data-route="portfolio">Portfolio</a>
-            <a href="#/compare" data-route="compare">Compare</a>
-            <a href="#/news" data-route="news">News</a>
-            <a href="#/settings" data-route="settings">Settings</a>
+          <button class="nav-toggle" id="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+          <nav class="main-nav finviz-nav" aria-label="Main">
+            <a href="#/">Home</a>
+            <a href="#/news">News</a>
+            <a href="#/screener">Screener</a>
+            <a href="#/charts">Charts</a>
+            <a href="#/map">Map</a>
+            <a href="#/groups">Groups</a>
+            <a href="#/portfolio">Portfolio</a>
+            <a href="#/insider">Insider</a>
+            <a href="#/signals">Signals</a>
+            <a href="#/patterns">Patterns</a>
+            <a href="#/futures">Futures</a>
+            <a href="#/calendar">Calendar</a>
+            <a href="#/compare">Compare</a>
+            <a href="#/settings">Settings</a>
           </nav>
           <div class="header-actions">
-            <button class="search-btn" id="search-btn" title="Search ( / or Ctrl+K )">
-              <span class="search-icon">⌕</span>
-              <span class="search-hint">Search</span>
-              <kbd>/</kbd>
-            </button>
-            <button class="theme-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">◐</button>
+            <button class="search-btn" id="search-btn" title="Search"><span>⌕</span><kbd>/</kbd></button>
+            <button class="theme-btn" id="theme-toggle" title="Theme">◐</button>
           </div>
           <div class="header-status">
             <span class="market-status" id="market-status"></span>
             <span class="status-dot" id="status-dot"></span>
-            <span class="status-text" id="status-text">Connecting…</span>
+            <span class="status-text" id="status-text">Loading…</span>
             <span class="last-update" id="last-update"></span>
           </div>
         </div>
       </header>
-
-      <div class="ticker-bar" id="ticker-bar" aria-label="Market indices"></div>
-
-      <main class="main-content" id="main-content"></main>
-
+      <div class="ticker-bar" id="ticker-bar"></div>
+      <main class="main-content finviz-main" id="main-content"></main>
       <footer class="site-footer">
-        <span>StockViz · Finviz-style screener</span>
+        <span>StockViz · Pattern Prediction Engine</span>
         <span id="footer-stats"></span>
-        <span><kbd>/</kbd> search · auto-refresh · <a href="https://github.com/joshpohlman/stockviz" target="_blank" rel="noopener">GitHub</a></span>
+        <span><a href="https://github.com/joshpohlman/stockviz" target="_blank" rel="noopener">GitHub</a></span>
       </footer>
-
-      <aside class="quote-panel" id="quote-panel" aria-label="Quote detail" hidden>
-        <button class="quote-close" id="quote-close" aria-label="Close quote panel">&times;</button>
+      <aside class="quote-panel" id="quote-panel" hidden>
+        <button class="quote-close" id="quote-close">&times;</button>
         <div id="quote-panel-body"></div>
       </aside>
       <div class="quote-overlay" id="quote-overlay" hidden></div>
-
       <div class="cmd-overlay" id="cmd-overlay" hidden></div>
-      <div class="command-palette" id="command-palette" hidden role="dialog" aria-label="Search stocks">
-        <input type="search" id="cmd-input" placeholder="Search ticker or company…" autocomplete="off" />
+      <div class="command-palette" id="command-palette" hidden>
+        <input type="search" id="cmd-input" placeholder="Search ticker…" autocomplete="off" />
         <div id="cmd-results" class="cmd-results"></div>
-        <p class="cmd-footer"><kbd>↑↓</kbd> navigate · <kbd>Enter</kbd> open · <kbd>Esc</kbd> close</p>
       </div>
-
-      <div id="toast-root" class="toast-root" aria-live="polite"></div>
+      <div id="toast-root" class="toast-root"></div>
     </div>
     <script type="module" src="/src/main.js"></script>
-    <script>
-      document.getElementById('search-btn')?.addEventListener('click', () => {
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
-      });
-    </script>
+    <script>document.getElementById('search-btn')?.addEventListener('click',()=>window.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true})));</script>
   </body>
 </html>

@@ -1,4 +1,5 @@
 import { UNIVERSE } from './data/universe.js';
+import { enrichWithTA } from './analysis/enrich.js';
 
 const FINNHUB_BASE = 'https://finnhub.io/api/v1';
 const BATCH_SIZE = 5;
@@ -193,7 +194,7 @@ export async function fetchAllQuotes(settings) {
   if (!settings.apiKey?.trim() || settings.useMockData) {
     tickMockPrices();
     const quotes = new Map();
-    for (const stock of UNIVERSE) quotes.set(stock.symbol, buildMockQuote(stock));
+    for (const stock of UNIVERSE) quotes.set(stock.symbol, enrichWithTA(buildMockQuote(stock)));
     return { quotes, source: 'mock' };
   }
 
@@ -215,14 +216,14 @@ export async function fetchAllQuotes(settings) {
     for (const r of results) {
       if (r.status === 'fulfilled') {
         const v = r.value;
-        quotes.set(v.symbol, { ...v, sparkline: pushSpark(v.symbol, v.price) });
+        quotes.set(v.symbol, enrichWithTA({ ...v, sparkline: pushSpark(v.symbol, v.price) }));
       }
     }
     if (i + BATCH_SIZE < symbols.length) await delay(BATCH_DELAY_MS);
   }
 
   for (const stock of UNIVERSE) {
-    if (!quotes.has(stock.symbol)) quotes.set(stock.symbol, buildMockQuote(stock));
+    if (!quotes.has(stock.symbol)) quotes.set(stock.symbol, enrichWithTA(buildMockQuote(stock)));
   }
 
   return { quotes, source: 'finnhub' };
@@ -231,16 +232,16 @@ export async function fetchAllQuotes(settings) {
 export async function fetchSingleQuote(symbol, settings) {
   const meta = UNIVERSE.find((s) => s.symbol === symbol);
   if (!settings.apiKey?.trim() || settings.useMockData) {
-    return meta ? buildMockQuote(meta) : null;
+    return meta ? enrichWithTA(buildMockQuote(meta)) : null;
   }
   try {
     const [quote, profile] = await Promise.all([
       fetchFinnhubQuote(symbol, settings.apiKey.trim()),
       fetchFinnhubProfile(symbol, settings.apiKey.trim()),
     ]);
-    return enrichQuote(quote, meta, profile);
+    return enrichWithTA(enrichQuote(quote, meta, profile));
   } catch {
-    return meta ? buildMockQuote(meta) : null;
+    return meta ? enrichWithTA(buildMockQuote(meta)) : null;
   }
 }
 
