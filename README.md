@@ -1,17 +1,22 @@
 # StockViz
 
-A Finviz-inspired stock screener and heat map you can customize and extend. Built with Vite and vanilla JavaScript.
+A Finviz-inspired stock screener you can customize and extend — with heat maps, portfolio tracking, live sparklines, and buttery-smooth price updates.
 
-**Live demo:** https://joshpohlman.github.io/stockviz/
+**Live:** https://joshpohlman.github.io/stockviz/
 
-## Features
+## Highlights
 
-- **Home** — watchlist, top gainers/losers, most active, sector performance
-- **Screener** — 11 one-click presets, custom filters, sortable columns, CSV export, shareable links, saved presets
-- **Heat Map** — sector treemap sized by market cap, colored by daily change
-- **News** — market headlines (Finnhub or simulated)
-- **Quote Panel** — 60-day price chart, company news, full stats
-- **Live data** — Finnhub API with polling, or simulated data without a key
+- **240+ US stocks** across all 11 sectors
+- **Live price patching** — updates tick without full page re-render
+- **Sparklines** on watchlist, screener, and compare views
+- **Command palette** — press `/` or `Ctrl+K` to jump to any ticker
+- **Portfolio** — track shares, cost basis, live P&L
+- **Compare** — side-by-side up to 4 stocks
+- **Screener** — 11 presets, favorites (★), CSV export, shareable filter URLs
+- **Heat map** — live-updating sector treemap
+- **News** — market headlines + per-stock news in quote panel
+- **Dark / light theme** — toggle with ◐ in the header
+- **Quote panel** — 60-day chart, news, favorite & compare actions
 
 ## Quick Start
 
@@ -21,44 +26,40 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173
+## Real-Time Data
 
-## Real-Time Data (Finnhub)
+1. Free API key: [finnhub.io/register](https://finnhub.io/register)
+2. **Settings** → paste key → Test → Save
+3. Auto-refresh every 30s (configurable)
 
-1. Register at [finnhub.io/register](https://finnhub.io/register) (free, 60 calls/min)
-2. Open **Settings** → paste API key → **Test Connection** → **Save**
-3. Quotes refresh every 30 seconds (configurable)
+Without a key, **simulated live data** runs out of the box.
 
-Without an API key, simulated live data updates on each refresh.
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `/` or `Ctrl+K` | Open stock search |
+| `Esc` | Close quote panel / search |
 
 ## Customize
 
 | What | File |
 |------|------|
-| Stock universe (~160 tickers) | `src/data/universe.js` |
+| Stock universe | `src/data/universe.js` |
 | Screener presets | `src/data/presets.js` |
-| Colors / layout | `src/style.css` |
-| API / mock logic | `src/api.js` |
+| Theme & colors | `src/style.css` |
+| API layer | `src/api.js` |
 
-## Deploy to GitHub Pages
+## Deploy
 
 ```bash
 npm run deploy:pages
 ```
 
-Requires the `stockviz` repo on GitHub under your account. Publishes to `https://<username>.github.io/stockviz/`.
+Or push to `main` — GitHub Actions deploys automatically.
 
-## Project Structure
+## Stack
 
-```
-src/
-  api.js              Finnhub + mock data
-  store.js            Settings, filters, cache
-  data/universe.js    Stock list
-  data/presets.js     Screener presets
-  pages/              Home, Screener, Map, News, Settings
-  components/         Chart, heatmap, quote panel
-  utils/              Formatting, CSV export, URL state
-```
+Vite · Vanilla JS · Finnhub API · Canvas charts · Zero frameworks
 
-MIT — use and modify freely.
+MIT

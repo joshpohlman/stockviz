@@ -19,10 +19,23 @@ function basePrice(symbol) {
 }
 
 let mockPrices = new Map();
+let mockSparkHistory = new Map();
+const SPARK_LEN = 24;
 
 function initMockPrices() {
   if (mockPrices.size) return;
-  for (const stock of UNIVERSE) mockPrices.set(stock.symbol, basePrice(stock.symbol));
+  for (const stock of UNIVERSE) {
+    const p = basePrice(stock.symbol);
+    mockPrices.set(stock.symbol, p);
+    const rand = seededRandom(stock.symbol + 'hist');
+    const hist = [];
+    let v = p * 0.95;
+    for (let i = 0; i < SPARK_LEN; i++) {
+      v = Math.max(1, v * (1 + (rand() - 0.48) * 0.02));
+      hist.push(v);
+    }
+    mockSparkHistory.set(stock.symbol, hist);
+  }
 }
 
 function tickMockPrices() {
@@ -30,8 +43,27 @@ function tickMockPrices() {
   for (const stock of UNIVERSE) {
     const prev = mockPrices.get(stock.symbol);
     const drift = (Math.random() - 0.48) * prev * 0.008;
-    mockPrices.set(stock.symbol, Math.max(1, prev + drift));
+    const next = Math.max(1, prev + drift);
+    mockPrices.set(stock.symbol, next);
+    const hist = mockSparkHistory.get(stock.symbol) || [];
+    hist.push(next);
+    if (hist.length > SPARK_LEN) hist.shift();
+    mockSparkHistory.set(stock.symbol, hist);
   }
+}
+
+let liveSparkHistory = new Map();
+
+function getSparkline(symbol) {
+  return liveSparkHistory.get(symbol) || mockSparkHistory.get(symbol) || [];
+}
+
+function pushSpark(symbol, price) {
+  const hist = liveSparkHistory.get(symbol) || mockSparkHistory.get(symbol) || [];
+  const next = [...hist, price];
+  if (next.length > SPARK_LEN) next.shift();
+  liveSparkHistory.set(symbol, next);
+  return next;
 }
 
 function buildMockQuote(stock) {
@@ -61,6 +93,7 @@ function buildMockQuote(stock) {
     industry: stock.industry,
     name: stock.name,
     timestamp: Date.now(),
+    sparkline: getSparkline(stock.symbol),
   };
 }
 
@@ -149,6 +182,7 @@ function enrichQuote(quote, meta, profile) {
       ? profile.marketCapitalization * 1_000_000
       : meta?.marketCap,
     volume: quote.volume ?? Math.floor(Math.random() * 20_000_000 + 1_000_000),
+    sparkline: getSparkline(quote.symbol),
   };
 }
 
@@ -179,7 +213,10 @@ export async function fetchAllQuotes(settings) {
     );
 
     for (const r of results) {
-      if (r.status === 'fulfilled') quotes.set(r.value.symbol, r.value);
+      if (r.status === 'fulfilled') {
+        const v = r.value;
+        quotes.set(v.symbol, { ...v, sparkline: pushSpark(v.symbol, v.price) });
+      }
     }
     if (i + BATCH_SIZE < symbols.length) await delay(BATCH_DELAY_MS);
   }

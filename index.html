@@ -1,10 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Finviz-style stock screener with heat maps, real-time quotes, and customizable filters." />
+    <meta name="description" content="Finviz-style stock screener with heat maps, portfolio tracking, real-time quotes, and customizable filters." />
+    <meta name="theme-color" content="#0d1117" />
     <title>StockViz — Stock Screener & Heat Map</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -25,9 +26,19 @@
             <a href="#/" data-route="home">Home</a>
             <a href="#/screener" data-route="screener">Screener</a>
             <a href="#/map" data-route="map">Heat Map</a>
+            <a href="#/portfolio" data-route="portfolio">Portfolio</a>
+            <a href="#/compare" data-route="compare">Compare</a>
             <a href="#/news" data-route="news">News</a>
             <a href="#/settings" data-route="settings">Settings</a>
           </nav>
+          <div class="header-actions">
+            <button class="search-btn" id="search-btn" title="Search ( / or Ctrl+K )">
+              <span class="search-icon">⌕</span>
+              <span class="search-hint">Search</span>
+              <kbd>/</kbd>
+            </button>
+            <button class="theme-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">◐</button>
+          </div>
           <div class="header-status">
             <span class="market-status" id="market-status"></span>
             <span class="status-dot" id="status-dot"></span>
@@ -41,12 +52,32 @@
 
       <main class="main-content" id="main-content"></main>
 
+      <footer class="site-footer">
+        <span>StockViz · Finviz-style screener</span>
+        <span id="footer-stats"></span>
+        <span><kbd>/</kbd> search · auto-refresh · <a href="https://github.com/joshpohlman/stockviz" target="_blank" rel="noopener">GitHub</a></span>
+      </footer>
+
       <aside class="quote-panel" id="quote-panel" aria-label="Quote detail" hidden>
         <button class="quote-close" id="quote-close" aria-label="Close quote panel">&times;</button>
         <div id="quote-panel-body"></div>
       </aside>
       <div class="quote-overlay" id="quote-overlay" hidden></div>
+
+      <div class="cmd-overlay" id="cmd-overlay" hidden></div>
+      <div class="command-palette" id="command-palette" hidden role="dialog" aria-label="Search stocks">
+        <input type="search" id="cmd-input" placeholder="Search ticker or company…" autocomplete="off" />
+        <div id="cmd-results" class="cmd-results"></div>
+        <p class="cmd-footer"><kbd>↑↓</kbd> navigate · <kbd>Enter</kbd> open · <kbd>Esc</kbd> close</p>
+      </div>
+
+      <div id="toast-root" class="toast-root" aria-live="polite"></div>
     </div>
     <script type="module" src="/src/main.js"></script>
+    <script>
+      document.getElementById('search-btn')?.addEventListener('click', () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+      });
+    </script>
   </body>
 </html>

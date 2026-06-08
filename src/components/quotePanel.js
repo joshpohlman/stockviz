@@ -1,7 +1,8 @@
 import { fetchSingleQuote, fetchCandles, fetchCompanyNews } from '../api.js';
-import { getSettings, setSelectedSymbol } from '../store.js';
+import { getSettings, setSelectedSymbol, toggleFavorite, isFavorite, toggleCompare, getCompareList } from '../store.js';
 import { fmtPrice, fmtChange, fmtPct, fmtVolume, fmtMarketCap, changeClass } from '../utils/format.js';
 import { renderPriceChart } from './chart.js';
+import { toast } from './toast.js';
 
 let panelEl, bodyEl, overlayEl, closeBtn;
 
@@ -22,14 +23,18 @@ export function openQuotePanel(symbol) {
   if (!panelEl) return;
   panelEl.hidden = false;
   overlayEl.hidden = false;
-  bodyEl.innerHTML = '<div class="quote-loading">Loading quote…</div>';
+  panelEl.classList.add('open');
+  bodyEl.innerHTML = '<div class="quote-loading"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>';
   loadQuote(symbol);
 }
 
 export function closeQuotePanel() {
   if (!panelEl) return;
-  panelEl.hidden = true;
-  overlayEl.hidden = true;
+  panelEl.classList.remove('open');
+  setTimeout(() => {
+    panelEl.hidden = true;
+    overlayEl.hidden = true;
+  }, 200);
   setSelectedSymbol(null);
 }
 
@@ -47,15 +52,23 @@ async function loadQuote(symbol) {
   }
 
   const cls = changeClass(quote.changePct);
+  const fav = isFavorite(symbol);
+  const inCompare = getCompareList().includes(symbol);
+
   bodyEl.innerHTML = `
+    <div class="quote-actions">
+      <button class="btn-ghost btn-sm quote-action ${fav ? 'starred' : ''}" id="qa-fav">${fav ? '★ Favorited' : '☆ Favorite'}</button>
+      <button class="btn-ghost btn-sm quote-action ${inCompare ? 'active' : ''}" id="qa-compare">${inCompare ? 'In Compare' : '+ Compare'}</button>
+      <a class="btn-ghost btn-sm quote-action" href="#/screener" id="qa-screener">Screener</a>
+    </div>
     <div class="quote-header">
       <div>
         <h2 class="quote-symbol">${quote.symbol}</h2>
         <p class="quote-name">${quote.name || ''}</p>
       </div>
-      <div class="quote-price-block">
-        <span class="quote-price">$${fmtPrice(quote.price)}</span>
-        <span class="quote-change ${cls}">${fmtChange(quote.change)} (${fmtPct(quote.changePct)})</span>
+      <div class="quote-price-block" data-live-symbol="${symbol}">
+        <span class="quote-price" data-live="price">$${fmtPrice(quote.price)}</span>
+        <span class="quote-change ${cls}" data-live="pct">${fmtChange(quote.change)} (${fmtPct(quote.changePct)})</span>
       </div>
     </div>
     <div class="quote-grid">
@@ -85,6 +98,30 @@ async function loadQuote(symbol) {
     </div>
   `;
 
+  bodyEl.querySelector('#qa-fav')?.addEventListener('click', () => {
+    const on = toggleFavorite(symbol);
+    const btn = bodyEl.querySelector('#qa-fav');
+    btn.textContent = on ? '★ Favorited' : '☆ Favorite';
+    btn.classList.toggle('starred', on);
+    toast(on ? `${symbol} favorited` : `${symbol} unfavorited`, 'info');
+  });
+
+  bodyEl.querySelector('#qa-compare')?.addEventListener('click', () => {
+    const on = toggleCompare(symbol);
+    const btn = bodyEl.querySelector('#qa-compare');
+    if (getCompareList().length > 4 && !on) {
+      toast('Compare list full (max 4)', 'error');
+      return;
+    }
+    btn.textContent = on ? 'In Compare' : '+ Compare';
+    btn.classList.toggle('active', on);
+    toast(on ? `${symbol} added to compare` : `${symbol} removed`, 'info');
+  });
+
   const chartHost = bodyEl.querySelector('#quote-chart');
-  if (chartHost) renderPriceChart(chartHost, candles, { height: 180 });
+  if (chartHost) {
+    renderPriceChart(chartHost, candles, { height: 180 });
+    const ro = new ResizeObserver(() => renderPriceChart(chartHost, candles, { height: 180 }));
+    ro.observe(chartHost);
+  }
 }

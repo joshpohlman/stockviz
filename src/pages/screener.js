@@ -1,6 +1,7 @@
 import {
   getQuotes, getFilters, getSort, getActivePreset, getSavedFilters,
-  updateFilters, applyPreset, setSort, resetFilters, saveFilterPreset, deleteSavedFilter, loadSavedFilter,
+  updateFilters, applyPreset, setSort, resetFilters, saveFilterPreset,
+  deleteSavedFilter, loadSavedFilter, toggleFavorite, isFavorite,
 } from '../store.js';
 import { SECTORS } from '../data/universe.js';
 import { PRESETS } from '../data/presets.js';
@@ -8,6 +9,8 @@ import { fmtPrice, fmtPct, fmtVolume, fmtMarketCap, changeClass } from '../utils
 import { applyFiltersFromQuotes } from './screenerFilters.js';
 import { exportToCsv } from '../utils/export.js';
 import { buildShareUrl, syncFiltersToUrl } from '../utils/urlState.js';
+import { sparklineHtml } from '../utils/sparkline.js';
+import { debounce } from '../utils/debounce.js';
 
 export function renderScreener(container) {
   const filters = getFilters();
@@ -89,37 +92,41 @@ export function renderScreener(container) {
       </div>
     ` : ''}
 
-    <div class="table-wrap">
+    <div class="table-wrap screener-scroll">
       <table class="data-table screener-table" id="screener-table">
         <thead>
           <tr>
+            <th class="col-star"></th>
             ${sortHeader('symbol', 'Ticker', sort)}
             ${sortHeader('name', 'Company', sort)}
+            <th>Trend</th>
             ${sortHeader('sector', 'Sector', sort)}
             ${sortHeader('price', 'Price', sort)}
-            ${sortHeader('change', 'Change', sort)}
             ${sortHeader('changePct', 'Change %', sort)}
             ${sortHeader('volume', 'Volume', sort)}
             ${sortHeader('marketCap', 'Market Cap', sort)}
           </tr>
         </thead>
         <tbody>
-          ${sorted.length ? sorted.map(renderRow).join('') : '<tr><td colspan="8" class="empty-row">No matches — adjust filters</td></tr>'}
+          ${sorted.length ? sorted.map(renderRow).join('') : '<tr><td colspan="9" class="empty-row">No matches — adjust filters</td></tr>'}
         </tbody>
       </table>
     </div>
   `;
 
   const form = container.querySelector('#filter-form');
-  const pushFilters = () => {
+  const pushFilters = debounce(() => {
     const fd = new FormData(form);
     updateFilters(Object.fromEntries(fd.entries()), { preset: 'custom' });
-  };
+  }, 180);
+
   form.addEventListener('input', pushFilters);
-  form.addEventListener('change', pushFilters);
+  form.addEventListener('change', () => {
+    const fd = new FormData(form);
+    updateFilters(Object.fromEntries(fd.entries()), { preset: 'custom' });
+  });
 
   container.querySelector('#reset-filters')?.addEventListener('click', resetFilters);
-
   container.querySelector('#save-filter')?.addEventListener('click', () => {
     const name = prompt('Name this filter preset:');
     if (name?.trim()) saveFilterPreset(name.trim());
@@ -143,9 +150,7 @@ export function renderScreener(container) {
     });
   });
 
-  container.querySelector('#export-csv')?.addEventListener('click', () => {
-    exportToCsv(sorted);
-  });
+  container.querySelector('#export-csv')?.addEventListener('click', () => exportToCsv(sorted));
 
   container.querySelector('#share-screener')?.addEventListener('click', async () => {
     const url = buildShareUrl(filters);
@@ -169,6 +174,15 @@ export function renderScreener(container) {
       window.dispatchEvent(new CustomEvent('stockviz:select', { detail: el.dataset.symbol }));
     });
   });
+
+  container.querySelectorAll('[data-fav]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const on = toggleFavorite(btn.dataset.fav);
+      btn.textContent = on ? '★' : '☆';
+      btn.classList.toggle('starred', on);
+    });
+  });
 }
 
 function sortHeader(key, label, sort) {
@@ -177,14 +191,18 @@ function sortHeader(key, label, sort) {
 }
 
 function renderRow(q) {
+  const fav = isFavorite(q.symbol);
   return `
-    <tr class="clickable" data-symbol="${q.symbol}">
+    <tr class="clickable" data-live-symbol="${q.symbol}" data-symbol="${q.symbol}">
+      <td class="col-star">
+        <button class="star-btn ${fav ? 'starred' : ''}" data-fav="${q.symbol}" aria-label="Favorite">${fav ? '★' : '☆'}</button>
+      </td>
       <td class="sym">${q.symbol}</td>
       <td class="name-cell">${q.name || '—'}</td>
+      <td>${sparklineHtml(q.symbol)}</td>
       <td class="sector-cell">${q.sector || '—'}</td>
-      <td>$${fmtPrice(q.price)}</td>
-      <td class="${changeClass(q.change)}">${q.change >= 0 ? '+' : ''}${q.change?.toFixed(2) ?? '—'}</td>
-      <td class="${changeClass(q.changePct)}">${fmtPct(q.changePct)}</td>
+      <td data-live="price">$${fmtPrice(q.price)}</td>
+      <td class="${changeClass(q.changePct)}" data-live="pct">${fmtPct(q.changePct)}</td>
       <td>${fmtVolume(q.volume)}</td>
       <td>${fmtMarketCap(q.marketCap)}</td>
     </tr>

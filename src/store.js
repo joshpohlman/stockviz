@@ -2,7 +2,8 @@ const DEFAULT_SETTINGS = {
   apiKey: '',
   refreshInterval: 30,
   useMockData: true,
-  watchlist: ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN'],
+  watchlist: ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA'],
+  theme: 'dark',
 };
 
 const DEFAULT_FILTERS = {
@@ -17,6 +18,9 @@ const DEFAULT_FILTERS = {
 let settings = loadSettings();
 let filters = { ...DEFAULT_FILTERS };
 let savedFilters = loadSavedFilters();
+let favorites = loadFavorites();
+let portfolio = loadPortfolio();
+let compareList = [];
 let activePreset = 'all';
 let quotes = new Map();
 let sort = { key: 'changePct', dir: 'desc' };
@@ -26,6 +30,7 @@ let dataSource = 'mock';
 let marketStatus = null;
 let listeners = new Set();
 let pollTimer = null;
+let lastNotifyReason = 'full';
 
 function loadSettings() {
   try {
@@ -43,9 +48,38 @@ function loadSavedFilters() {
   return [];
 }
 
+function loadFavorites() {
+  try {
+    const raw = localStorage.getItem('stockviz-favorites');
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return ['AAPL', 'NVDA', 'MSFT'];
+}
+
+function loadPortfolio() {
+  try {
+    const raw = localStorage.getItem('stockviz-portfolio');
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [
+    { symbol: 'AAPL', shares: 10, costBasis: 175 },
+    { symbol: 'NVDA', shares: 5, costBasis: 450 },
+    { symbol: 'MSFT', shares: 8, costBasis: 380 },
+  ];
+}
+
+function persist(key, data) {
+  localStorage.setItem(key, JSON.stringify(data));
+}
+
 function saveSettings() {
-  localStorage.setItem('stockviz-settings', JSON.stringify(settings));
-  notify();
+  persist('stockviz-settings', settings);
+  applyTheme(settings.theme);
+  notify('settings');
+}
+
+export function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme || 'dark');
 }
 
 export function getSettings() {
@@ -54,9 +88,12 @@ export function getSettings() {
 
 export function updateSettings(patch) {
   settings = { ...settings, ...patch };
-  if (patch.apiKey !== undefined) {
-    settings.useMockData = !patch.apiKey?.trim();
-  }
+  if (patch.apiKey !== undefined) settings.useMockData = !patch.apiKey?.trim();
+  saveSettings();
+}
+
+export function toggleTheme() {
+  settings.theme = settings.theme === 'dark' ? 'light' : 'dark';
   saveSettings();
 }
 
@@ -67,13 +104,13 @@ export function getFilters() {
 export function updateFilters(patch, { preset = null } = {}) {
   filters = { ...filters, ...patch };
   if (preset !== null) activePreset = preset;
-  notify();
+  notify('filters');
 }
 
 export function applyPreset(presetId, presetFilters) {
   filters = { ...DEFAULT_FILTERS, ...presetFilters };
   activePreset = presetId;
-  notify();
+  notify('filters');
 }
 
 export function getActivePreset() {
@@ -87,7 +124,7 @@ export function getSort() {
 export function setSort(key) {
   if (sort.key === key) sort.dir = sort.dir === 'asc' ? 'desc' : 'asc';
   else sort = { key, dir: 'desc' };
-  notify();
+  notify('sort');
 }
 
 export function getQuotes() {
@@ -98,12 +135,12 @@ export function setQuotes(newQuotes, meta = {}) {
   quotes = newQuotes;
   lastFetchAt = meta.fetchedAt ?? Date.now();
   dataSource = meta.source ?? dataSource;
-  notify();
+  notify('quotes');
 }
 
 export function setMarketStatus(status) {
   marketStatus = status;
-  notify();
+  notify('status');
 }
 
 export function getMarketStatus() {
@@ -116,11 +153,68 @@ export function getMeta() {
 
 export function setSelectedSymbol(symbol) {
   selectedSymbol = symbol;
-  notify();
+  notify('select');
 }
 
 export function getSelectedSymbol() {
   return selectedSymbol;
+}
+
+export function getFavorites() {
+  return [...favorites];
+}
+
+export function toggleFavorite(symbol) {
+  if (favorites.includes(symbol)) favorites = favorites.filter((s) => s !== symbol);
+  else favorites = [...favorites, symbol];
+  persist('stockviz-favorites', favorites);
+  notify('favorites');
+  return favorites.includes(symbol);
+}
+
+export function isFavorite(symbol) {
+  return favorites.includes(symbol);
+}
+
+export function getPortfolio() {
+  return [...portfolio];
+}
+
+export function addPortfolioHolding({ symbol, shares, costBasis }) {
+  const existing = portfolio.find((p) => p.symbol === symbol);
+  if (existing) {
+    existing.shares += Number(shares);
+    existing.costBasis = (existing.costBasis + Number(costBasis)) / 2;
+  } else {
+    portfolio = [...portfolio, { symbol, shares: Number(shares), costBasis: Number(costBasis) }];
+  }
+  persist('stockviz-portfolio', portfolio);
+  notify('portfolio');
+}
+
+export function removePortfolioHolding(symbol) {
+  portfolio = portfolio.filter((p) => p.symbol !== symbol);
+  persist('stockviz-portfolio', portfolio);
+  notify('portfolio');
+}
+
+export function getCompareList() {
+  return [...compareList];
+}
+
+export function toggleCompare(symbol) {
+  if (compareList.includes(symbol)) {
+    compareList = compareList.filter((s) => s !== symbol);
+  } else if (compareList.length < 4) {
+    compareList = [...compareList, symbol];
+  }
+  notify('compare');
+  return compareList.includes(symbol);
+}
+
+export function clearCompare() {
+  compareList = [];
+  notify('compare');
 }
 
 export function getSavedFilters() {
@@ -130,15 +224,15 @@ export function getSavedFilters() {
 export function saveFilterPreset(name) {
   const entry = { id: Date.now().toString(), name, filters: { ...filters } };
   savedFilters = [...savedFilters, entry];
-  localStorage.setItem('stockviz-saved-filters', JSON.stringify(savedFilters));
-  notify();
+  persist('stockviz-saved-filters', savedFilters);
+  notify('filters');
   return entry;
 }
 
 export function deleteSavedFilter(id) {
   savedFilters = savedFilters.filter((f) => f.id !== id);
-  localStorage.setItem('stockviz-saved-filters', JSON.stringify(savedFilters));
-  notify();
+  persist('stockviz-saved-filters', savedFilters);
+  notify('filters');
 }
 
 export function loadSavedFilter(id) {
@@ -146,7 +240,7 @@ export function loadSavedFilter(id) {
   if (entry) {
     filters = { ...DEFAULT_FILTERS, ...entry.filters };
     activePreset = 'custom';
-    notify();
+    notify('filters');
   }
 }
 
@@ -155,8 +249,13 @@ export function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
-function notify() {
-  listeners.forEach((fn) => fn());
+export function getLastNotifyReason() {
+  return lastNotifyReason;
+}
+
+function notify(reason = 'full') {
+  lastNotifyReason = reason;
+  listeners.forEach((fn) => fn(reason));
 }
 
 export function startPolling(fetchFn) {
@@ -176,5 +275,7 @@ export function stopPolling() {
 export function resetFilters() {
   filters = { ...DEFAULT_FILTERS };
   activePreset = 'all';
-  notify();
+  notify('filters');
 }
+
+applyTheme(settings.theme);
