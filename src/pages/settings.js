@@ -5,6 +5,7 @@ import {
 } from '../utils/notifications.js';
 import { clearMarketWidgetCache } from '../api/marketExtras.js';
 import { clearLiveAdvancedCache } from '../api/liveAdvanced.js';
+import { clearHomeIndicesCache } from '../api/homeIndices.js';
 import { auditFmpEndpoints } from '../api/fmpHealth.js';
 import { getUniverseMeta, refreshUniverse } from '../data/universeStore.js';
 import { downloadSettingsBundle, copySettingsBundle, importFromEncoded } from '../utils/settingsBundle.js';
@@ -173,6 +174,7 @@ export function renderSettings(container) {
 
     clearMarketWidgetCache();
     clearLiveAdvancedCache();
+    clearHomeIndicesCache();
 
     if (pushNotifications && getNotificationPermission() === 'default') {
       await requestNotificationPermission();

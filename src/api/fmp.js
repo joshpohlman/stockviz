@@ -223,13 +223,24 @@ function formatForexPair(sym) {
 
 export async function fetchFmpIndexQuotes(apiKey) {
   const data = await fmpFetch('/batch-index-quotes', apiKey);
-  const map = { '^DJI': 'Dow', '^GSPC': 'S&P 500', '^IXIC': 'Nasdaq 100', '^RUT': 'Russell 2000' };
+  const map = { '^DJI': 'Dow', '^GSPC': 'S&P 500', '^IXIC': 'Nasdaq', '^RUT': 'Russell 2000', '^VIX': 'VIX' };
   return (Array.isArray(data) ? data : []).filter((q) => map[q.symbol]).map((q) => ({
     name: map[q.symbol],
     symbol: q.symbol,
     last: q.price ?? 0,
     change: q.change ?? 0,
     changePct: q.changesPercentage ?? q.changePercentage ?? 0,
+  }));
+}
+
+/** End-of-day index history for mini charts (^GSPC, ^DJI, etc.). */
+export async function fetchFmpIndexHistory(symbol, apiKey, count = 60) {
+  const data = await fmpFetch('/historical-price-eod/light', apiKey, { symbol });
+  const rows = Array.isArray(data) ? data : data?.historical || [];
+  return rows.slice(0, count).reverse().map((r) => ({
+    t: new Date(r.date).getTime(),
+    c: r.price ?? r.close ?? 0,
+    v: r.volume ?? 0,
   }));
 }
 

@@ -7,6 +7,8 @@ import {
   INSIDER_TRADES, EARNINGS_CALENDAR, ECON_CALENDAR,
 } from '../data/marketData.js';
 import { fetchMarketNews, fetchMarketWidgets } from '../api.js';
+import { fetchHomeIndices } from '../api/homeIndices.js';
+import { renderHomeIndexCharts } from '../components/homeIndexCharts.js';
 
 const LEFT_TAPE = [
   { signal: 'top_gainers', limit: 7, sort: (a, b) => b.changePct - a.changePct },
@@ -28,9 +30,10 @@ export async function renderHome(container) {
   const settings = getSettings();
   const rows = [...quotes.values()];
   const breadth = getMarketBreadth(quotes);
-  const [news, widgets] = await Promise.all([
+  const [news, widgets, indices] = await Promise.all([
     fetchMarketNews(settings).catch(() => []),
     fetchMarketWidgets(settings).catch(() => null),
+    fetchHomeIndices(settings, quotes).catch(() => []),
   ]);
 
   const earningsData = widgets?.earnings?.length ? widgets.earnings : EARNINGS_CALENDAR;
@@ -64,6 +67,8 @@ export async function renderHome(container) {
           <a class="home-market-text" href="${news[0].url || '#/'}" target="_blank" rel="noopener">${news[0].headline || news[0].title}</a>
         </div>
       ` : ''}
+
+      <section class="panel home-indices-panel" id="home-indices"></section>
 
       <div class="breadth-bar panel finviz-breadth">
         <div class="breadth-item">
@@ -253,6 +258,11 @@ export async function renderHome(container) {
       </div>
     </div>
   `;
+
+  const indicesHost = container.querySelector('#home-indices');
+  if (indicesHost && indices.length) {
+    renderHomeIndexCharts(indicesHost, indices);
+  }
 
   const heatHost = container.querySelector('#home-heatmap');
   if (heatHost) {
