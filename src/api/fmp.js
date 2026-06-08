@@ -13,12 +13,23 @@ function fmpUrl(path, apiKey, params = {}) {
   return u.toString();
 }
 
+const FETCH_TIMEOUT_MS = 20000;
+
 async function fmpFetch(path, apiKey, params = {}) {
-  const res = await fetch(fmpUrl(path, apiKey, params));
-  if (!res.ok) throw new Error(`FMP ${res.status}`);
-  const data = await res.json();
-  if (data?.['Error Message']) throw new Error(data['Error Message']);
-  return data;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(fmpUrl(path, apiKey, params), { signal: controller.signal });
+    if (!res.ok) throw new Error(`FMP ${res.status}`);
+    const data = await res.json();
+    if (data?.['Error Message']) throw new Error(data['Error Message']);
+    return data;
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('FMP request timed out');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function delay(ms) {
@@ -56,14 +67,20 @@ function mapFmpQuote(row) {
   };
 }
 
-export async function fetchFmpBatchQuotes(symbols, apiKey) {
+export async function fetchFmpBatchQuotes(symbols, apiKey, { onChunk } = {}) {
   const results = new Map();
   for (let i = 0; i < symbols.length; i += QUOTE_CHUNK) {
     const chunk = symbols.slice(i, i + QUOTE_CHUNK).map(toFmpSymbol);
-    const data = await fmpFetch('/batch-quote', apiKey, { symbols: chunk.join(',') });
-    const rows = Array.isArray(data) ? data : [data];
-    for (const row of rows) {
-      if (row?.symbol) results.set(fromFmpSymbol(row.symbol), mapFmpQuote(row));
+    try {
+      const data = await fmpFetch('/batch-quote', apiKey, { symbols: chunk.join(',') });
+      const rows = Array.isArray(data) ? data : [data];
+      for (const row of rows) {
+        if (row?.symbol) results.set(fromFmpSymbol(row.symbol), mapFmpQuote(row));
+      }
+      if (onChunk) onChunk(new Map(results));
+    } catch (err) {
+      console.warn(`FMP batch quote chunk ${i / QUOTE_CHUNK + 1} failed:`, err.message);
+      if (onChunk && results.size) onChunk(new Map(results));
     }
     if (i + QUOTE_CHUNK < symbols.length) await delay(CHUNK_DELAY_MS);
   }

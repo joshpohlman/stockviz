@@ -84,6 +84,17 @@ function applyUniverse(rows, source) {
   };
 }
 
+/** Apply cached S&P 500 list synchronously so the UI can render immediately. */
+export function hydrateUniverseFromCache(settings) {
+  const key = !settings.useMockData && settings.fmpApiKey?.trim() ? settings.fmpApiKey.trim() : null;
+  if (!key) return universeMeta;
+  const cached = loadCache();
+  if (cached?.length >= 400) {
+    applyUniverse(cached, 'sp500');
+  }
+  return universeMeta;
+}
+
 /** Load S&P 500 from FMP when key is set; otherwise use bundled list. */
 export async function initUniverse(settings, { force = false } = {}) {
   const key = !settings.useMockData && settings.fmpApiKey?.trim() ? settings.fmpApiKey.trim() : null;

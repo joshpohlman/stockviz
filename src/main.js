@@ -8,7 +8,7 @@ import {
 } from './store.js';
 import { checkAlerts } from './alerts/alertEngine.js';
 import { toast } from './components/toast.js';
-import { initUniverse, getUniverseMeta } from './data/universeStore.js';
+import { initUniverse, hydrateUniverseFromCache, getUniverseMeta } from './data/universeStore.js';
 import { fmtPrice, fmtPct, changeClass, fmtTime } from './utils/format.js';
 import { patchLivePrices } from './utils/livePatch.js';
 import { initQuotePanel, openQuotePanel } from './components/quotePanel.js';
@@ -83,12 +83,20 @@ const routes = {
 const PATCH_ONLY = new Set(['quotes', 'status']);
 let currentRoute = '/';
 let isFirstLoad = true;
+let quotesLoading = false;
 
 async function refreshQuotes() {
   const settings = getSettings();
+  quotesLoading = true;
+  updateStatus('loading');
   try {
     const [{ quotes, source }, status] = await Promise.all([
-      fetchAllQuotes(settings),
+      fetchAllQuotes(settings, {
+        onProgress: (partial, src) => {
+          setQuotes(partial, { fetchedAt: Date.now(), source: src });
+          updateStatus('loading');
+        },
+      }),
       fetchMarketStatus(settings),
     ]);
     setQuotes(quotes, { fetchedAt: Date.now(), source });
@@ -110,6 +118,8 @@ async function refreshQuotes() {
   } catch (err) {
     console.error('Quote fetch failed:', err);
     updateStatus('error');
+  } finally {
+    quotesLoading = false;
   }
 }
 
@@ -121,7 +131,10 @@ function updateStatus(source) {
   const meta = getMeta();
   const mkt = getMarketStatus();
 
-  if (source === 'error') {
+  if (source === 'loading') {
+    dot.className = 'status-dot';
+    text.textContent = 'Loading quotes…';
+  } else if (source === 'error') {
     dot.className = 'status-dot';
     text.textContent = 'Update failed';
   } else if (source === 'fmp') {
@@ -249,7 +262,7 @@ function navigate(animate = true) {
 
 function onStoreChange(reason) {
   if (reason === 'alerts') updateAlertBadge();
-  if (PATCH_ONLY.has(reason) && routes[currentRoute]) {
+  if (PATCH_ONLY.has(reason) && routes[currentRoute] && !quotesLoading) {
     patchLivePrices();
     renderTickerBar();
     updateStatus(getMeta().dataSource);
@@ -283,9 +296,14 @@ function boot() {
   });
 
   subscribe(onStoreChange);
-  initUniverse(getSettings()).then(() => {
-    refreshQuotes().then(() => { navigate(); startPolling(refreshQuotes); });
-  });
+
+  const settings = getSettings();
+  hydrateUniverseFromCache(settings);
+  navigate();
+
+  initUniverse(settings)
+    .catch((err) => console.warn('Universe init failed:', err))
+    .finally(() => startPolling(refreshQuotes));
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {});

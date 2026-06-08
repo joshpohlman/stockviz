@@ -208,7 +208,7 @@ function enrichQuote(quote, meta, profile) {
   };
 }
 
-export async function fetchAllQuotes(settings) {
+export async function fetchAllQuotes(settings, { onProgress } = {}) {
   const universe = getUniverse();
   const universeMap = getUniverseMap();
   const symbols = universe.map((s) => s.symbol);
@@ -224,19 +224,28 @@ export async function fetchAllQuotes(settings) {
   if (provider === 'fmp') {
     const apiKey = settings.fmpApiKey.trim();
     const quotes = new Map();
-    try {
-      const fmpQuotes = await fetchFmpBatchQuotes(symbols, apiKey);
+    const enrichBatch = (fmpQuotes) => {
+      let added = false;
       for (const symbol of symbols) {
         const q = fmpQuotes.get(symbol);
-        if (q) {
+        if (q && !quotes.has(symbol)) {
           const meta = universeMap.get(symbol);
           const enriched = enrichQuote(q, meta);
           quotes.set(symbol, enrichWithTA({
             ...enriched,
             sparkline: pushSpark(symbol, enriched.price),
           }));
+          added = true;
         }
       }
+      if (added && onProgress) onProgress(new Map(quotes), 'fmp');
+    };
+
+    try {
+      const fmpQuotes = await fetchFmpBatchQuotes(symbols, apiKey, {
+        onChunk: (partial) => enrichBatch(partial),
+      });
+      enrichBatch(fmpQuotes);
     } catch (err) {
       console.warn('FMP batch quotes failed:', err);
     }
