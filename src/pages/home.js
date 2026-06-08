@@ -76,43 +76,43 @@ export async function renderHome(container) {
       <div class="breadth-bar panel finviz-breadth">
         <div class="breadth-item">
           <span class="breadth-label">Advancing</span>
-          <span class="breadth-val pos">${breadth.advPct.toFixed(1)}%</span>
-          <span class="breadth-sub">(${breadth.advancing})</span>
+          <span class="breadth-val pos" data-live="adv-pct">${breadth.advPct.toFixed(1)}%</span>
+          <span class="breadth-sub" data-live="adv-count">(${breadth.advancing})</span>
         </div>
         <div class="breadth-item">
           <span class="breadth-label">Declining</span>
-          <span class="breadth-sub">(${breadth.declining})</span>
-          <span class="breadth-val neg">${breadth.decPct.toFixed(1)}%</span>
+          <span class="breadth-sub" data-live="dec-count">(${breadth.declining})</span>
+          <span class="breadth-val neg" data-live="dec-pct">${breadth.decPct.toFixed(1)}%</span>
         </div>
         <div class="breadth-item">
           <span class="breadth-label">New High</span>
-          <span class="breadth-val pos">${breadth.newHighPct.toFixed(1)}%</span>
-          <span class="breadth-sub">(${breadth.newHigh})</span>
+          <span class="breadth-val pos" data-live="nh-pct">${breadth.newHighPct.toFixed(1)}%</span>
+          <span class="breadth-sub" data-live="nh-count">(${breadth.newHigh})</span>
         </div>
         <div class="breadth-item">
           <span class="breadth-label">New Low</span>
           <span class="breadth-sub">(${breadth.newLow})</span>
-          <span class="breadth-val neg">${(100 - breadth.newHighPct).toFixed(1)}%</span>
+          <span class="breadth-val neg" data-live="nl-pct">${(100 - breadth.newHighPct).toFixed(1)}%</span>
         </div>
         <div class="breadth-item">
           <span class="breadth-label">Above</span>
-          <span class="breadth-val">${breadth.aboveSma50Pct.toFixed(1)}%</span>
-          <span class="breadth-sub">SMA50 (${breadth.aboveSma50})</span>
+          <span class="breadth-val" data-live="sma50-pct">${breadth.aboveSma50Pct.toFixed(1)}%</span>
+          <span class="breadth-sub">SMA50 <span data-live="sma50-above">(${breadth.aboveSma50})</span></span>
         </div>
         <div class="breadth-item">
           <span class="breadth-label">Below</span>
-          <span class="breadth-sub">(${breadth.belowSma50})</span>
-          <span class="breadth-val">${(100 - breadth.aboveSma50Pct).toFixed(1)}%</span>
+          <span class="breadth-sub" data-live="sma50-below">(${breadth.belowSma50})</span>
+          <span class="breadth-val" data-live="sma50-below-pct">${(100 - breadth.aboveSma50Pct).toFixed(1)}%</span>
         </div>
         <div class="breadth-item">
           <span class="breadth-label">Above</span>
-          <span class="breadth-val">${breadth.aboveSma200Pct.toFixed(1)}%</span>
-          <span class="breadth-sub">SMA200 (${breadth.aboveSma200})</span>
+          <span class="breadth-val" data-live="sma200-pct">${breadth.aboveSma200Pct.toFixed(1)}%</span>
+          <span class="breadth-sub">SMA200 <span data-live="sma200-above">(${breadth.aboveSma200})</span></span>
         </div>
         <div class="breadth-item">
           <span class="breadth-label">Below</span>
-          <span class="breadth-sub">(${breadth.belowSma200})</span>
-          <span class="breadth-val">${(100 - breadth.aboveSma200Pct).toFixed(1)}%</span>
+          <span class="breadth-sub" data-live="sma200-below">(${breadth.belowSma200})</span>
+          <span class="breadth-val" data-live="sma200-below-pct">${(100 - breadth.aboveSma200Pct).toFixed(1)}%</span>
         </div>
       </div>
 

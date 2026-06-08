@@ -13,6 +13,7 @@ import {
   fetchFmpExtendedQuote,
   fetchFmpSp500Constituents,
   fetchFmpRatiosTtm,
+  fetchFmpSharesFloat,
 } from './fmp.js';
 
 async function probe(name, fn) {
@@ -50,7 +51,7 @@ export async function auditFmpEndpoints(apiKey) {
     probe('Earnings Calendar', () => fetchFmpEarningsCalendar(key)),
     probe('Insider Trades', () => fetchFmpInsiderTrades(key, 5)),
     probe('Analyst Grades', () => fetchFmpAnalystData('AAPL', key)),
-    probe('Short Interest', () => fetchFmpShortInterest('AAPL', key)),
+    probe('Shares Float (shorts)', () => fetchFmpSharesFloat('AAPL', key)),
     probe('Options Chain', () => fetchFmpOptionsChain('AAPL', key)),
     probe('Financials', () => fetchFmpFinancials('AAPL', key)),
     probe('SEC Filings', () => fetchFmpSecFilings('AAPL', key)),

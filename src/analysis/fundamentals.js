@@ -140,13 +140,15 @@ export function mapFmpMetrics({ ratios, metrics, profile } = {}) {
   const m = metrics || {};
   return {
     peTTM: r.priceToEarningsRatioTTM ?? r.peRatioTTM,
-    peFwd: r.priceToEarningsRatioTTM,
+    peFwd: r.priceToEarningsRatioTTM ?? r.peRatioTTM,
+    epsForward: m.estimatedEps ?? m.forwardEps ?? null,
     peg: r.priceToEarningsGrowthRatioTTM ?? r.pegRatioTTM,
     ps: r.priceToSalesRatioTTM,
     pb: r.priceToBookRatioTTM,
     evEbitda: m.enterpriseValueOverEBITDATTM ?? r.enterpriseValueMultipleTTM,
     epsTTM: r.netIncomePerShareTTM ?? m.netIncomePerShareTTM,
-    epsGrowthTTMYoy: r.revenueGrowthTTM ?? m.revenuePerShareTTM,
+    epsGrowthTTMYoy: r.epsGrowthTTM ?? m.epsGrowthTTM ?? r.revenueGrowthTTM,
+    revenueGrowth: r.revenueGrowthTTM ?? m.revenueGrowthTTM,
     dividendYield: r.dividendYieldTTM ?? r.dividendYielTTM,
     beta: profile?.beta ?? r.betaTTM,
     high52: profile?.range?.split('-')?.[1]?.trim() || null,

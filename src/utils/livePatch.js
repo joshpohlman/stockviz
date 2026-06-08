@@ -1,12 +1,16 @@
 import { getQuotes } from '../store.js';
-import { fmtPrice, fmtPct, changeClass, heatColor } from './format.js';
+import { fmtPrice, fmtPct, fmtIndexPrice, changeClass, heatColor } from './format.js';
 import { drawSparkline } from './sparkline.js';
 import { patchIndexCharts } from '../components/homeIndexCharts.js';
 import { patchHomeSectorBars } from '../components/homeSectorBars.js';
+import { getCachedTickerIndices } from '../api/liveAdvanced.js';
+import { getMarketBreadth } from '../analysis/enrich.js';
+import { renderHeatmap } from '../components/heatmap.js';
 
 /** Patch live price cells without full page re-render — keeps UI buttery on refresh. */
 export function patchLivePrices() {
   const quotes = getQuotes();
+  const tickerIndices = getCachedTickerIndices();
 
   document.querySelectorAll('[data-live-symbol]').forEach((el) => {
     const q = quotes.get(el.dataset.liveSymbol);
@@ -18,15 +22,7 @@ export function patchLivePrices() {
 
     if (priceEl) {
       const isIndex = priceEl.dataset.liveFormat === 'index';
-      const formatted = isIndex
-        ? (() => {
-            const p = q.price;
-            if (!p) return '—';
-            if (p >= 10000) return p.toLocaleString('en-US', { maximumFractionDigits: 0 });
-            if (p >= 1000) return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            return p.toFixed(2);
-          })()
-        : `$${fmtPrice(q.price)}`;
+      const formatted = isIndex ? fmtIndexPrice(q.price) : `$${fmtPrice(q.price)}`;
       if (priceEl.textContent !== formatted) {
         priceEl.textContent = formatted;
         flashEl(priceEl, q.change >= 0 ? 'flash-up' : 'flash-down');
@@ -39,6 +35,25 @@ export function patchLivePrices() {
     if (pctEl) {
       pctEl.textContent = fmtPct(q.changePct);
       pctEl.className = changeClass(q.changePct);
+    }
+  });
+
+  document.querySelectorAll('.ticker-item').forEach((el) => {
+    const sym = el.dataset.indexSymbol;
+    const live = sym ? tickerIndices?.get(sym) : null;
+    const etfQ = el.dataset.navSymbol ? quotes.get(el.dataset.navSymbol) : null;
+    const price = live?.price ?? etfQ?.price;
+    const changePct = live?.changePct ?? etfQ?.changePct;
+    if (price == null) return;
+
+    const priceEl = el.querySelector('[data-live="price"]');
+    const pctEl = el.querySelector('[data-live="pct"]');
+    if (priceEl) {
+      priceEl.textContent = live ? fmtIndexPrice(price) : `$${fmtPrice(price)}`;
+    }
+    if (pctEl) {
+      pctEl.textContent = fmtPct(changePct);
+      pctEl.className = `ticker-chg ${changeClass(changePct)}`;
     }
   });
 
@@ -68,9 +83,43 @@ function flashEl(el, cls) {
   setTimeout(() => el.classList.remove(cls), 600);
 }
 
-/** Refresh home-page index candlesticks and sector bar chart. */
+function patchHomeBreadth() {
+  const bar = document.querySelector('.finviz-breadth');
+  if (!bar) return;
+  const b = getMarketBreadth(getQuotes());
+  const set = (key, text) => {
+    const el = bar.querySelector(`[data-live="${key}"]`);
+    if (el) el.textContent = text;
+  };
+  set('adv-pct', `${b.advPct.toFixed(1)}%`);
+  set('adv-count', `(${b.advancing})`);
+  set('dec-count', `(${b.declining})`);
+  set('dec-pct', `${b.decPct.toFixed(1)}%`);
+  set('nh-pct', `${b.newHighPct.toFixed(1)}%`);
+  set('nh-count', `(${b.newHigh})`);
+  set('nl-pct', `${(100 - b.newHighPct).toFixed(1)}%`);
+  set('sma50-pct', `${b.aboveSma50Pct.toFixed(1)}%`);
+  set('sma50-above', `(${b.aboveSma50})`);
+  set('sma50-below', `(${b.belowSma50})`);
+  set('sma50-below-pct', `${(100 - b.aboveSma50Pct).toFixed(1)}%`);
+  set('sma200-pct', `${b.aboveSma200Pct.toFixed(1)}%`);
+  set('sma200-above', `(${b.aboveSma200})`);
+  set('sma200-below', `(${b.belowSma200})`);
+  set('sma200-below-pct', `${(100 - b.aboveSma200Pct).toFixed(1)}%`);
+}
+
+function patchHomeHeatmap() {
+  const heatHost = document.getElementById('home-heatmap');
+  if (!heatHost) return;
+  renderHeatmap(heatHost, [...getQuotes().values()], (symbol) => {
+    window.dispatchEvent(new CustomEvent('stockviz:select', { detail: symbol }));
+  });
+}
+
+/** Refresh home-page charts, sector bars, breadth, and heatmap without full re-render. */
 export function patchHomeCharts() {
-  const quotes = getQuotes();
-  patchIndexCharts(quotes);
-  patchHomeSectorBars(quotes);
+  patchIndexCharts();
+  patchHomeSectorBars(getQuotes());
+  patchHomeBreadth();
+  patchHomeHeatmap();
 }

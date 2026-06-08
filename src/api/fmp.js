@@ -42,12 +42,13 @@ export function toFmpSymbol(symbol) {
 }
 
 export function fromFmpSymbol(symbol) {
-  return symbol.replace('-', '.');
+  return symbol.replace(/-/g, '.');
 }
 
 function mapFmpQuote(row) {
+  if (row?.price == null) return null;
   const sym = fromFmpSymbol(row.symbol);
-  const price = row.price ?? 0;
+  const price = row.price;
   const prevClose = row.previousClose ?? price;
   const change = row.change ?? price - prevClose;
   const changePct = row.changesPercentage ?? row.changePercentage ?? (prevClose ? (change / prevClose) * 100 : 0);
@@ -75,7 +76,9 @@ export async function fetchFmpBatchQuotes(symbols, apiKey, { onChunk } = {}) {
       const data = await fmpFetch('/batch-quote', apiKey, { symbols: chunk.join(',') });
       const rows = Array.isArray(data) ? data : [data];
       for (const row of rows) {
-        if (row?.symbol) results.set(fromFmpSymbol(row.symbol), mapFmpQuote(row));
+        if (!row?.symbol) continue;
+        const mapped = mapFmpQuote(row);
+        if (mapped) results.set(mapped.symbol, mapped);
       }
       if (onChunk) onChunk(new Map(results));
     } catch (err) {
@@ -90,7 +93,7 @@ export async function fetchFmpBatchQuotes(symbols, apiKey, { onChunk } = {}) {
 export async function fetchFmpQuote(symbol, apiKey) {
   const data = await fmpFetch('/quote', apiKey, { symbol: toFmpSymbol(symbol) });
   const row = Array.isArray(data) ? data[0] : data;
-  if (!row?.price) throw new Error('No FMP quote');
+  if (row?.price == null) throw new Error('No FMP quote');
   return mapFmpQuote(row);
 }
 
@@ -146,7 +149,7 @@ function mapFmpNews(n) {
     headline: n.title,
     title: n.title,
     source: n.site || n.publisher || '',
-    url: n.url || n.image || '#',
+    url: n.url || '#',
     datetime: n.publishedDate ? Math.floor(new Date(n.publishedDate).getTime() / 1000) : undefined,
     symbol: n.symbol,
   };
@@ -192,6 +195,14 @@ export async function fetchFmpEconomicCalendar(apiKey) {
   }));
 }
 
+function mapInsiderType(t) {
+  const code = (t.transactionType || '').toUpperCase();
+  const disp = (t.acquisitionOrDisposition || t.acquistionOrDisposition || '').toUpperCase();
+  if (code === 'P' || disp === 'A' || /purchase|buy/i.test(t.transactionType || '')) return 'Buy';
+  if (code === 'S' || disp === 'D' || /sale|sell/i.test(t.transactionType || '')) return 'Sale';
+  return 'Sale';
+}
+
 export async function fetchFmpInsiderTrades(apiKey, limit = 20) {
   const data = await fmpFetch('/insider-trading/latest', apiKey, { page: 0, limit });
   return (Array.isArray(data) ? data : []).slice(0, limit).map((t) => ({
@@ -199,7 +210,7 @@ export async function fetchFmpInsiderTrades(apiKey, limit = 20) {
     insider: t.reportingName || t.name || '—',
     relation: t.typeOfOwner || t.ownerType || '—',
     date: t.transactionDate?.slice(5) || t.filingDate?.slice(5) || '—',
-    type: /purchase|buy|acquisition/i.test(t.transactionType || t.acquistionOrDisposition || '') ? 'Buy' : 'Sale',
+    type: mapInsiderType(t),
     cost: t.price ?? 0,
     shares: Math.abs(t.securitiesTransacted ?? t.shares ?? 0),
     value: Math.abs((t.securitiesTransacted ?? 0) * (t.price ?? 0)),
@@ -261,15 +272,22 @@ export async function fetchFmpIndexHistory(symbol, apiKey, count = 60) {
   }));
 }
 
+function treasuryRow(name, last, prev) {
+  const change = last != null && prev != null ? last - prev : 0;
+  const changePct = prev ? (change / prev) * 100 : 0;
+  return { name, last: last ?? 0, change, changePct };
+}
+
 export async function fetchFmpTreasuryRates(apiKey) {
   const data = await fmpFetch('/treasury-rates', apiKey);
   const rows = Array.isArray(data) ? data : [];
   const latest = rows[0];
+  const prior = rows[1];
   if (!latest) return [];
   return [
-    { name: '5-Year Treasury', last: latest.year5 ?? 0, change: 0, changePct: 0 },
-    { name: '10-Year Treasury', last: latest.year10 ?? 0, change: 0, changePct: 0 },
-    { name: '30-Year Treasury', last: latest.year30 ?? 0, change: 0, changePct: 0 },
+    treasuryRow('5-Year Treasury', latest.year5, prior?.year5),
+    treasuryRow('10-Year Treasury', latest.year10, prior?.year10),
+    treasuryRow('30-Year Treasury', latest.year30, prior?.year30),
   ];
 }
 
@@ -363,37 +381,23 @@ export async function fetchFmpSharesFloat(symbol, apiKey) {
   return Array.isArray(data) ? data[0] : data;
 }
 
+function normalizeShortPct(value) {
+  if (value == null || Number.isNaN(value)) return 0;
+  if (value > 0 && value < 1) return value * 100;
+  return value;
+}
+
 export async function fetchFmpShortInterest(symbol, apiKey) {
-  try {
-    const data = await fmpFetch('/short-interest', apiKey, { symbol: toFmpSymbol(symbol) });
-    const row = Array.isArray(data) ? data[0] : data;
-    if (row) {
-      return {
-        symbol,
-        shortPct: row.shortPercentOfFloat ?? row.shortInterest ?? 0,
-        daysToCover: row.daysToCover ?? row.shortRatio ?? 0,
-        change: row.change ?? 0,
-      };
-    }
-  } catch { /* plan may not include short-interest */ }
-
-  const [sharesFloat, metrics] = await Promise.all([
+  const [sharesFloat] = await Promise.all([
     fetchFmpSharesFloat(symbol, apiKey).catch(() => null),
-    fetchFmpKeyMetricsTtm(symbol, apiKey).catch(() => null),
   ]);
-  if (!sharesFloat && !metrics) return null;
+  if (!sharesFloat) return null;
 
-  let shortPct = sharesFloat?.shortPercentOfFloat ?? sharesFloat?.shortInterest ?? 0;
-  if (shortPct > 0 && shortPct < 1) shortPct *= 100;
-  const daysToCover = sharesFloat?.daysToCover ?? sharesFloat?.shortRatio ?? 0;
+  const shortPct = normalizeShortPct(sharesFloat.shortPercentOfFloat ?? sharesFloat.shortPercent ?? 0);
+  const daysToCover = sharesFloat.daysToCover ?? sharesFloat.shortRatio ?? 0;
   if (!shortPct && !daysToCover) return null;
 
-  return {
-    symbol,
-    shortPct,
-    daysToCover,
-    change: 0,
-  };
+  return { symbol, shortPct, daysToCover, change: 0 };
 }
 
 export async function fetchFmpBatchShortInterest(symbols, apiKey) {
@@ -462,19 +466,13 @@ export async function fetchFmpSecFilings(symbol, apiKey) {
   const to = new Date().toISOString().slice(0, 10);
   const from = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
 
-  const paths = [
-    ['/sec-filings-search/symbol', { symbol: sym, from, to, page: 0, limit: 10 }],
-    ['/sec-filings', { symbol: sym, limit: 10 }],
-  ];
-
-  for (const [path, params] of paths) {
-    try {
-      const data = await fmpFetch(path, apiKey, params);
-      const rows = Array.isArray(data) ? data : data?.filings || [];
-      if (rows.length) return rows.map(mapSecFiling);
-    } catch { /* try next path */ }
+  try {
+    const data = await fmpFetch('/sec-filings-search/symbol', apiKey, { symbol: sym, from, to, page: 0, limit: 10 });
+    const rows = Array.isArray(data) ? data : data?.filings || [];
+    return rows.map(mapSecFiling);
+  } catch {
+    return [];
   }
-  return [];
 }
 
 export async function fetchFmpSp500Constituents(apiKey) {
@@ -523,22 +521,24 @@ export async function fetchFmpExtendedQuote(symbol, apiKey) {
 export async function fetchFmpIndexTickerQuotes(apiKey) {
   const data = await fmpFetch('/batch-index-quotes', apiKey);
   const map = {
-    '^GSPC': { symbol: 'SPY', label: 'S&P 500' },
-    '^IXIC': { symbol: 'QQQ', label: 'NASDAQ' },
-    '^DJI': { symbol: 'DIA', label: 'DOW' },
-    '^RUT': { symbol: 'IWM', label: 'RUSSELL 2K' },
+    '^GSPC': { label: 'S&P 500', etf: 'SPY' },
+    '^IXIC': { label: 'NASDAQ', etf: 'QQQ' },
+    '^DJI': { label: 'DOW', etf: 'DIA' },
+    '^RUT': { label: 'RUSSELL 2K', etf: 'IWM' },
   };
   const indices = Array.isArray(data) ? data : [];
   const out = new Map();
   for (const q of indices) {
     const meta = map[q.symbol];
     if (!meta) continue;
-    out.set(meta.symbol, {
-      symbol: meta.symbol,
+    out.set(q.symbol, {
+      symbol: q.symbol,
+      etf: meta.etf,
       label: meta.label,
       price: q.price ?? 0,
       change: q.change ?? 0,
       changePct: q.changesPercentage ?? q.changePercentage ?? 0,
+      isIndex: true,
     });
   }
   return out;

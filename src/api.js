@@ -203,8 +203,9 @@ function enrichQuote(quote, meta, profile) {
     marketCap: profile?.marketCapitalization
       ? profile.marketCapitalization * 1_000_000
       : profile?.marketCap || quote.marketCap || meta?.marketCap,
-    volume: quote.volume ?? Math.floor(Math.random() * 20_000_000 + 1_000_000),
+    volume: quote.volume ?? 0,
     sparkline: getSparkline(quote.symbol),
+    live: true,
   };
 }
 
@@ -228,12 +229,13 @@ export async function fetchAllQuotes(settings, { onProgress } = {}) {
       let added = false;
       for (const symbol of symbols) {
         const q = fmpQuotes.get(symbol);
-        if (q && !quotes.has(symbol)) {
+        if (q?.price != null && !quotes.has(symbol)) {
           const meta = universeMap.get(symbol);
           const enriched = enrichQuote(q, meta);
           quotes.set(symbol, enrichWithTA({
             ...enriched,
             sparkline: pushSpark(symbol, enriched.price),
+            live: true,
           }));
           added = true;
         }
@@ -250,10 +252,15 @@ export async function fetchAllQuotes(settings, { onProgress } = {}) {
       console.warn('FMP batch quotes failed:', err);
     }
 
+    let mockFilled = 0;
     for (const stock of universe) {
-      if (!quotes.has(stock.symbol)) quotes.set(stock.symbol, enrichWithTA(buildMockQuote(stock)));
+      if (!quotes.has(stock.symbol)) {
+        quotes.set(stock.symbol, enrichWithTA({ ...buildMockQuote(stock), live: false }));
+        mockFilled++;
+      }
     }
-    return { quotes, source: 'fmp' };
+    const source = mockFilled > 0 && mockFilled < universe.length ? 'fmp-partial' : 'fmp';
+    return { quotes, source };
   }
 
   const quotes = new Map();
