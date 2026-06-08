@@ -9,6 +9,7 @@ import {
 import { fetchMarketNews, fetchMarketWidgets } from '../api.js';
 import { fetchHomeIndices } from '../api/homeIndices.js';
 import { renderHomeIndexCharts } from '../components/homeIndexCharts.js';
+import { renderHomeSectorBars } from '../components/homeSectorBars.js';
 
 const LEFT_TAPE = [
   { signal: 'top_gainers', limit: 7, sort: (a, b) => b.changePct - a.changePct },
@@ -69,6 +70,8 @@ export async function renderHome(container) {
       ` : ''}
 
       <section class="panel home-indices-panel" id="home-indices"></section>
+
+      <section class="panel home-sector-bars-panel" id="home-sector-bars"></section>
 
       <div class="breadth-bar panel finviz-breadth">
         <div class="breadth-item">
@@ -262,6 +265,11 @@ export async function renderHome(container) {
   const indicesHost = container.querySelector('#home-indices');
   if (indicesHost && indices.length) {
     renderHomeIndexCharts(indicesHost, indices);
+  }
+
+  const sectorHost = container.querySelector('#home-sector-bars');
+  if (sectorHost) {
+    renderHomeSectorBars(sectorHost, quotes);
   }
 
   const heatHost = container.querySelector('#home-heatmap');

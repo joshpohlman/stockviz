@@ -1,5 +1,7 @@
 import { getDataProvider } from '../api.js';
-import { fetchFmpIndexQuotes, fetchFmpIndexHistory, fetchFmpCandles } from './fmp.js';
+import { fetchFmpIndexQuotes, fetchFmpCandles } from './fmp.js';
+
+const BAR_COUNT = 30;
 
 export const HOME_INDICES = [
   { symbol: '^GSPC', label: 'S&P 500', etf: 'SPY', decimals: 2 },
@@ -22,13 +24,17 @@ function seededRand(seed) {
   };
 }
 
-function mockHistory(price, symbol, count = 60) {
+function mockHistory(price, symbol, count = 30) {
   const rand = seededRand(symbol + 'idx');
   const series = [];
   let v = price * (0.97 + rand() * 0.02);
   for (let i = 0; i < count; i++) {
+    const o = v;
     v = Math.max(0.01, v * (1 + (rand() - 0.48) * 0.012));
-    series.push({ t: Date.now() - (count - i) * 86400000, c: v });
+    const c = v;
+    const h = Math.max(o, c) * (1 + rand() * 0.006);
+    const l = Math.min(o, c) * (1 - rand() * 0.006);
+    series.push({ t: Date.now() - (count - i) * 86400000, o, h, l, c });
   }
   series[series.length - 1].c = price;
   return series;
@@ -52,14 +58,14 @@ function etfFallback(meta, quotes) {
 
 async function loadIndexHistory(meta, apiKey) {
   try {
-    const history = await fetchFmpIndexHistory(meta.symbol, apiKey, 60);
-    if (history.length >= 10) return history;
+    const candles = await fetchFmpCandles(meta.symbol, apiKey, BAR_COUNT);
+    if (candles.length >= 10) return candles;
   } catch { /* fall through */ }
 
   if (meta.etf) {
     try {
-      const candles = await fetchFmpCandles(meta.etf, apiKey, 60);
-      if (candles.length >= 10) return candles.map((c) => ({ t: c.t, c: c.c }));
+      const candles = await fetchFmpCandles(meta.etf, apiKey, BAR_COUNT);
+      if (candles.length >= 10) return candles;
     } catch { /* fall through */ }
   }
   return null;

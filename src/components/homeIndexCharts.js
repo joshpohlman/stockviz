@@ -1,4 +1,4 @@
-import { drawAreaChart } from '../utils/sparkline.js';
+import { drawMiniCandles } from '../utils/sparkline.js';
 import { fmtPct, changeClass } from '../utils/format.js';
 
 export function renderHomeIndexCharts(container, indices) {
@@ -28,11 +28,7 @@ export function renderHomeIndexCharts(container, indices) {
 
     const paint = () => {
       const w = canvas.parentElement?.clientWidth || 180;
-      drawAreaChart(canvas, idx.history, {
-        width: w,
-        height: 72,
-        positive: idx.changePct >= 0,
-      });
+      drawMiniCandles(canvas, idx.history, { width: w, height: 72 });
     };
 
     paint();
