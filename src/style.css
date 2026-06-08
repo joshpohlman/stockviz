@@ -1107,12 +1107,99 @@ kbd {
 .pattern-label { color: var(--text-muted); font-size: 0.7rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
 
 /* Finviz home */
-.finviz-home { display: flex; flex-direction: column; gap: 0.5rem; }
-.breadth-bar { display: flex; flex-wrap: wrap; gap: 1.5rem; padding: 0.5rem 0.75rem; }
-.breadth-item { display: flex; align-items: baseline; gap: 0.35rem; font-size: 0.75rem; }
+.finviz-home { display: flex; flex-direction: column; gap: 0.4rem; }
+
+/* Finviz-style home market line */
+.home-market-line {
+  padding: 0.4rem 0.65rem;
+  font-size: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+.home-market-time { color: var(--text-muted); font-family: var(--mono); font-size: 0.68rem; white-space: nowrap; }
+.home-market-text { color: var(--text); text-decoration: none; line-height: 1.35; }
+.home-market-text:hover { color: var(--accent); }
+
+.breadth-bar { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; padding: 0.45rem 0.65rem; }
+.finviz-breadth { justify-content: space-between; }
+.breadth-item { display: flex; align-items: baseline; gap: 0.3rem; font-size: 0.72rem; }
 .breadth-label { color: var(--text-muted); }
 .breadth-val { font-weight: 700; font-family: var(--mono); }
 .breadth-sub { color: var(--text-muted); font-size: 0.65rem; }
+
+/* Main 4-column Finviz grid: left tape | heatmap+patterns | right tape | news */
+.home-main-grid {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.1fr) minmax(280px, 1.6fr) minmax(200px, 1.1fr) minmax(180px, 0.9fr);
+  gap: 0.4rem;
+  align-items: start;
+}
+@media (max-width: 1400px) {
+  .home-main-grid { grid-template-columns: 1fr 1fr; }
+  .home-news-col { grid-column: 1 / -1; }
+}
+@media (max-width: 800px) {
+  .home-main-grid { grid-template-columns: 1fr; }
+}
+
+.home-tape-col { padding: 0.35rem; overflow: hidden; }
+.home-tape-tbl { width: 100%; }
+.home-tape-tbl th, .home-tape-tbl td { font-size: 0.68rem !important; padding: 0.18rem 0.3rem !important; white-space: nowrap; }
+.home-tape-extra { margin-top: 0; border-top: none; }
+.home-tape-extra td { border-top: 1px solid var(--border); }
+
+.home-center-col { padding: 0.35rem; min-width: 0; }
+.home-heatmap-host {
+  min-height: 220px;
+  max-height: 280px;
+  overflow: hidden;
+  margin-bottom: 0.35rem;
+}
+.home-heatmap-host .treemap { min-height: 200px; max-height: 260px; }
+.home-heatmap-host .heatmap-legend { margin-bottom: 0.25rem; }
+.home-heatmap-host .sector-block { min-height: 40px; }
+.home-heatmap-host .heat-tile { font-size: 0.55rem; padding: 1px 2px; }
+
+.home-pattern-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.35rem;
+}
+.home-pattern-tbl th, .home-pattern-tbl td { font-size: 0.65rem !important; padding: 0.15rem 0.3rem !important; }
+
+.home-news-col { padding: 0.35rem; }
+.home-headlines { max-height: 160px; }
+.major-news-strip { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.25rem; }
+.major-news-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 0.68rem;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+.major-news-chip:hover { border-color: var(--accent); background: var(--bg-elevated); }
+
+/* Bottom row: calendar, earnings, insider, futures, forex */
+.home-bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.4rem;
+}
+@media (max-width: 1200px) { .home-bottom-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .home-bottom-grid { grid-template-columns: 1fr; } }
+.home-bottom-panel { padding: 0.35rem; }
+.home-mini-tbl th, .home-mini-tbl td { font-size: 0.65rem !important; padding: 0.15rem 0.3rem !important; }
+
+.pos-title { color: var(--green); }
+.neg-title { color: var(--red); }
 
 .finviz-cols { display: grid; grid-template-columns: 1fr 1fr 1fr 1.1fr; gap: 0.5rem; }
 @media (max-width: 1200px) { .finviz-cols { grid-template-columns: 1fr 1fr; } }
