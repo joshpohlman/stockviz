@@ -4,7 +4,10 @@ import {
   getSettings, getQuotes, getMeta, getMarketStatus,
   setQuotes, setMarketStatus, subscribe, startPolling, stopPolling,
   setSelectedSymbol, toggleTheme, applyTheme,
+  getActiveAlertCount, getTriggeredAlertCount,
 } from './store.js';
+import { checkAlerts } from './alerts/alertEngine.js';
+import { toast } from './components/toast.js';
 import { UNIVERSE } from './data/universe.js';
 import { fmtPrice, fmtPct, changeClass, fmtTime } from './utils/format.js';
 import { patchLivePrices } from './utils/livePatch.js';
@@ -25,6 +28,9 @@ import { renderFutures } from './pages/futures.js';
 import { renderCalendar } from './pages/calendar.js';
 import { renderInsider } from './pages/insider.js';
 import { renderSettings } from './pages/settings.js';
+import { renderMultiCharts } from './pages/multicharts.js';
+import { renderAlerts } from './pages/alerts.js';
+import { renderExportApi } from './pages/exportApi.js';
 import { applyFiltersFromUrl } from './utils/urlState.js';
 import { drawSparkline } from './utils/sparkline.js';
 
@@ -39,6 +45,9 @@ const routes = {
   '/patterns': renderPatterns,
   '/groups': renderGroups,
   '/charts': renderCharts,
+  '/multicharts': renderMultiCharts,
+  '/alerts': renderAlerts,
+  '/export': renderExportApi,
   '/futures': renderFutures,
   '/calendar': renderCalendar,
   '/insider': renderInsider,
@@ -59,6 +68,9 @@ async function refreshQuotes() {
     setQuotes(quotes, { fetchedAt: Date.now(), source });
     setMarketStatus(status);
     updateStatus(source);
+    const fired = checkAlerts(quotes);
+    fired.forEach((a) => toast(`Alert: ${a.symbol} — ${a.detail}`, 'success', 5000));
+    updateAlertBadge();
   } catch (err) {
     console.error('Quote fetch failed:', err);
     updateStatus('error');
@@ -90,6 +102,16 @@ function updateStatus(source) {
     market.className = `market-status ${mkt.isOpen ? 'open' : 'closed'}`;
   }
   updateFooterStats();
+}
+
+function updateAlertBadge() {
+  const el = document.getElementById('alert-badge');
+  if (!el) return;
+  const active = getActiveAlertCount();
+  const triggered = getTriggeredAlertCount();
+  el.textContent = active + triggered;
+  el.hidden = active + triggered === 0;
+  el.classList.toggle('has-triggered', triggered > 0);
 }
 
 function updateFooterStats() {
@@ -173,6 +195,7 @@ function navigate(animate = true) {
 }
 
 function onStoreChange(reason) {
+  if (reason === 'alerts') updateAlertBadge();
   if (PATCH_ONLY.has(reason) && routes[currentRoute]) {
     patchLivePrices();
     renderTickerBar();

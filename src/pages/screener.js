@@ -31,6 +31,8 @@ export function renderScreener(container) {
       </div>
       <div class="screener-actions">
         <button type="button" class="btn-secondary" id="export-csv">Export CSV</button>
+        <button type="button" class="btn-secondary" id="export-full">Full TA CSV</button>
+        <a href="#/export" class="btn-secondary">Export API</a>
         <button type="button" class="btn-secondary" id="share-screener">Copy Link</button>
         <span class="result-count">${sorted.length} results</span>
       </div>
@@ -155,6 +157,7 @@ export function renderScreener(container) {
   });
 
   container.querySelector('#export-csv')?.addEventListener('click', () => exportToCsv(sorted));
+  container.querySelector('#export-full')?.addEventListener('click', () => exportToCsv(sorted, 'stockviz-screener-ta.csv', true));
 
   container.querySelector('#share-screener')?.addEventListener('click', async () => {
     const url = buildShareUrl(filters);

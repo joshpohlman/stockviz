@@ -31,6 +31,8 @@ let savedFilters = loadSavedFilters();
 let favorites = loadFavorites();
 let portfolio = loadPortfolio();
 let compareList = [];
+let alerts = loadAlerts();
+let multiChartLayout = loadMultiChartLayout();
 let activePreset = 'all';
 let quotes = new Map();
 let sort = { key: 'changePct', dir: 'desc' };
@@ -64,6 +66,22 @@ function loadFavorites() {
     if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
   return ['AAPL', 'NVDA', 'MSFT'];
+}
+
+function loadAlerts() {
+  try {
+    const raw = localStorage.getItem('stockviz-alerts');
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [];
+}
+
+function loadMultiChartLayout() {
+  try {
+    const raw = localStorage.getItem('stockviz-multichart');
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return { id: '2x2', symbols: ['AAPL', 'MSFT', 'NVDA', 'GOOGL'] };
 }
 
 function loadPortfolio() {
@@ -225,6 +243,65 @@ export function toggleCompare(symbol) {
 export function clearCompare() {
   compareList = [];
   notify('compare');
+}
+
+export function getAlerts() {
+  return [...alerts];
+}
+
+export function getActiveAlertCount() {
+  return alerts.filter((a) => a.active && !a.triggered).length;
+}
+
+export function getTriggeredAlertCount() {
+  return alerts.filter((a) => a.triggered).length;
+}
+
+export function addAlert({ symbol, type, value, note = '' }) {
+  const entry = {
+    id: Date.now().toString(),
+    symbol, type, value: String(value), note,
+    active: true, triggered: false, triggeredAt: null, triggerDetail: null,
+    createdAt: Date.now(),
+  };
+  alerts = [...alerts, entry];
+  persist('stockviz-alerts', alerts);
+  notify('alerts');
+  return entry;
+}
+
+export function removeAlert(id) {
+  alerts = alerts.filter((a) => a.id !== id);
+  persist('stockviz-alerts', alerts);
+  notify('alerts');
+}
+
+export function toggleAlert(id) {
+  alerts = alerts.map((a) => a.id === id ? { ...a, active: !a.active } : a);
+  persist('stockviz-alerts', alerts);
+  notify('alerts');
+}
+
+export function markAlertTriggered(id, detail) {
+  alerts = alerts.map((a) => a.id === id ? { ...a, triggered: true, triggeredAt: Date.now(), triggerDetail: detail } : a);
+  persist('stockviz-alerts', alerts);
+  notify('alerts');
+}
+
+export function clearTriggeredAlerts() {
+  alerts = alerts.filter((a) => !a.triggered);
+  persist('stockviz-alerts', alerts);
+  notify('alerts');
+}
+
+export function getMultiChartLayout() {
+  return { ...multiChartLayout };
+}
+
+export function setMultiChartLayout(layout) {
+  multiChartLayout = { ...layout };
+  persist('stockviz-multichart', multiChartLayout);
+  notify('multichart');
 }
 
 export function getSavedFilters() {

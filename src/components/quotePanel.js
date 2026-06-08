@@ -1,5 +1,5 @@
 import { fetchSingleQuote, fetchCandles, fetchCompanyNews } from '../api.js';
-import { getSettings, getQuotes, setSelectedSymbol, toggleFavorite, isFavorite, toggleCompare, getCompareList } from '../store.js';
+import { getSettings, getQuotes, setSelectedSymbol, toggleFavorite, isFavorite, toggleCompare, getCompareList, addAlert } from '../store.js';
 import { fmtPrice, fmtChange, fmtPct, fmtVolume, fmtMarketCap, changeClass } from '../utils/format.js';
 import { renderPriceChart } from './chart.js';
 import { toast } from './toast.js';
@@ -61,7 +61,8 @@ async function loadQuote(symbol) {
     <div class="quote-actions">
       <button class="btn-ghost btn-sm quote-action ${fav ? 'starred' : ''}" id="qa-fav">${fav ? '★ Favorited' : '☆ Favorite'}</button>
       <button class="btn-ghost btn-sm quote-action ${inCompare ? 'active' : ''}" id="qa-compare">${inCompare ? 'In Compare' : '+ Compare'}</button>
-      <a class="btn-ghost btn-sm quote-action" href="#/screener" id="qa-screener">Screener</a>
+      <button class="btn-ghost btn-sm quote-action" id="qa-alert">+ Alert</button>
+      <a class="btn-ghost btn-sm quote-action" href="#/multicharts">Multi-Chart</a>
     </div>
     <div class="quote-header">
       <div>
@@ -123,6 +124,15 @@ async function loadQuote(symbol) {
       </div>
     </div>
   `;
+
+  bodyEl.querySelector('#qa-alert')?.addEventListener('click', () => {
+    const type = prompt('Alert type: price_above, price_below, change_above, rsi_above, prediction\n(or visit Alerts page)', 'price_above');
+    if (!type) return;
+    const value = prompt('Threshold value:', String(quote.price));
+    if (value == null) return;
+    addAlert({ symbol, type, value, note: `Quick alert from quote panel` });
+    toast(`Alert set for ${symbol}`, 'success');
+  });
 
   bodyEl.querySelector('#qa-fav')?.addEventListener('click', () => {
     const on = toggleFavorite(symbol);
