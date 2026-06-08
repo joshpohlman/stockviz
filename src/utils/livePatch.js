@@ -1,6 +1,8 @@
 import { getQuotes } from '../store.js';
 import { fmtPrice, fmtPct, changeClass, heatColor } from './format.js';
 import { drawSparkline } from './sparkline.js';
+import { patchIndexCharts } from '../components/homeIndexCharts.js';
+import { patchHomeSectorBars } from '../components/homeSectorBars.js';
 
 /** Patch live price cells without full page re-render — keeps UI buttery on refresh. */
 export function patchLivePrices() {
@@ -15,9 +17,18 @@ export function patchLivePrices() {
     const pctEl = el.querySelector('[data-live="pct"]');
 
     if (priceEl) {
-      const next = `$${fmtPrice(q.price)}`;
-      if (priceEl.textContent !== next) {
-        priceEl.textContent = next;
+      const isIndex = priceEl.dataset.liveFormat === 'index';
+      const formatted = isIndex
+        ? (() => {
+            const p = q.price;
+            if (!p) return '—';
+            if (p >= 10000) return p.toLocaleString('en-US', { maximumFractionDigits: 0 });
+            if (p >= 1000) return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return p.toFixed(2);
+          })()
+        : `$${fmtPrice(q.price)}`;
+      if (priceEl.textContent !== formatted) {
+        priceEl.textContent = formatted;
         flashEl(priceEl, q.change >= 0 ? 'flash-up' : 'flash-down');
       }
     }
@@ -55,4 +66,11 @@ function flashEl(el, cls) {
   void el.offsetWidth;
   el.classList.add(cls);
   setTimeout(() => el.classList.remove(cls), 600);
+}
+
+/** Refresh home-page index candlesticks and sector bar chart. */
+export function patchHomeCharts() {
+  const quotes = getQuotes();
+  patchIndexCharts(quotes);
+  patchHomeSectorBars(quotes);
 }

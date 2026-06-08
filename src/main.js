@@ -10,7 +10,7 @@ import { checkAlerts } from './alerts/alertEngine.js';
 import { toast } from './components/toast.js';
 import { initUniverse, hydrateUniverseFromCache, getUniverseMeta } from './data/universeStore.js';
 import { fmtPrice, fmtPct, changeClass, fmtTime } from './utils/format.js';
-import { patchLivePrices } from './utils/livePatch.js';
+import { patchLivePrices, patchHomeCharts } from './utils/livePatch.js';
 import { initQuotePanel, openQuotePanel } from './components/quotePanel.js';
 import { initCommandPalette } from './components/commandPalette.js';
 import { initToast } from './components/toast.js';
@@ -115,6 +115,9 @@ async function refreshQuotes() {
       deliverAlertWebhook(settings, a);
     });
     updateAlertBadge();
+    await loadTickerIndices();
+    renderTickerBar();
+    if (currentRoute === '/') patchHomeCharts();
   } catch (err) {
     console.error('Quote fetch failed:', err);
     updateStatus('error');
@@ -265,6 +268,7 @@ function onStoreChange(reason) {
   if (PATCH_ONLY.has(reason) && routes[currentRoute] && !quotesLoading) {
     patchLivePrices();
     renderTickerBar();
+    if (currentRoute === '/') patchHomeCharts();
     updateStatus(getMeta().dataSource);
     return;
   }
@@ -306,7 +310,9 @@ function boot() {
     .finally(() => startPolling(refreshQuotes));
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {});
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`)
+      .then((reg) => reg?.update?.())
+      .catch(() => {});
   }
 }
 

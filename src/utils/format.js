@@ -3,6 +3,14 @@ export function fmtPrice(n, decimals = 2) {
   return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
+/** Index levels (S&P, Dow) — no dollar sign. */
+export function fmtIndexPrice(price, decimals = 2) {
+  if (!price) return '—';
+  if (price >= 10000) return price.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  if (price >= 1000) return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return price.toFixed(decimals);
+}
+
 export function fmtChange(n) {
   if (n == null || Number.isNaN(n)) return '—';
   const sign = n >= 0 ? '+' : '';

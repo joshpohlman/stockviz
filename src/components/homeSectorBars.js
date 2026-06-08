@@ -39,3 +39,13 @@ export function renderHomeSectorBars(container, quotes) {
   ro.observe(container);
   return () => ro.disconnect();
 }
+
+/** Repaint sector bars from latest quotes without rebuilding the panel. */
+export function patchHomeSectorBars(quotes) {
+  const canvas = document.querySelector('.home-sector-bars-canvas');
+  if (!canvas) return;
+  const sectors = buildSectorStats(quotes);
+  if (!sectors.length) return;
+  const w = canvas.parentElement?.clientWidth || 600;
+  drawSectorBarChart(canvas, sectors, { width: w, height: 150 });
+}

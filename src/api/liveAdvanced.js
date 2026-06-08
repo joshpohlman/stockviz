@@ -32,6 +32,10 @@ export function clearLiveAdvancedCache() {
   cache.clear();
 }
 
+export function getCachedTickerIndices() {
+  return getCache('indices');
+}
+
 function fmpKey(settings) {
   if (settings.useMockData) return null;
   return settings.fmpApiKey?.trim() || null;
