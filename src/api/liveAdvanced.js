@@ -13,7 +13,7 @@ import {
   generateOptionsFlow,
   generateShortInterest,
 } from '../data/advancedData.js';
-import { UNIVERSE } from '../data/universe.js';
+import { getUniverse } from '../data/universeStore.js';
 
 const CACHE_TTL = 10 * 60 * 1000;
 const cache = new Map();
@@ -214,5 +214,5 @@ export async function fetchTickerIndices(settings) {
 }
 
 export function getUniverseSymbols() {
-  return UNIVERSE.map((s) => s.symbol);
+  return getUniverse().map((s) => s.symbol);
 }

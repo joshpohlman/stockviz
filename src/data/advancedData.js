@@ -1,5 +1,3 @@
-import { UNIVERSE } from './universe.js';
-
 function seededRand(seed) {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;

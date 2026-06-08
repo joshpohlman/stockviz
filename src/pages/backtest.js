@@ -1,5 +1,5 @@
 import { getQuotes, getSettings } from '../store.js';
-import { UNIVERSE } from '../data/universe.js';
+import { getUniverse } from '../data/universeStore.js';
 import { getStrategies, runBacktest, monteCarloProjection } from '../analysis/backtest.js';
 import { fetchCandles, getDataProvider } from '../api.js';
 import { fmtPrice, changeClass } from '../utils/format.js';
@@ -30,7 +30,7 @@ export async function renderBacktest(container) {
       </div>
       <div class="backtest-controls">
         <select id="bt-symbol" class="chart-select">
-          ${UNIVERSE.slice(0, 80).map((s) => `<option value="${s.symbol}" ${s.symbol === selectedSymbol ? 'selected' : ''}>${s.symbol}</option>`).join('')}
+          ${getUniverse().slice(0, 80).map((s) => `<option value="${s.symbol}" ${s.symbol === selectedSymbol ? 'selected' : ''}>${s.symbol}</option>`).join('')}
         </select>
         <select id="bt-strategy" class="chart-select">
           ${strategies.map((s) => `<option value="${s.id}" ${s.id === selectedStrategy ? 'selected' : ''}>${s.label}</option>`).join('')}

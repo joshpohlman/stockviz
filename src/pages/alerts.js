@@ -1,7 +1,7 @@
 import {
   getAlerts, addAlert, removeAlert, toggleAlert, clearTriggeredAlerts, rearmAlert, rearmAllAlerts,
 } from '../store.js';
-import { UNIVERSE } from '../data/universe.js';
+import { getUniverse, findUniverseStock } from '../data/universeStore.js';
 import { ALERT_TYPES } from '../alerts/alertEngine.js';
 import { SIGNAL_GROUPS, PATTERN_GROUPS } from '../data/marketData.js';
 import { toast } from '../components/toast.js';
@@ -23,7 +23,7 @@ export function renderAlerts(container) {
         <div class="filter-group">
           <label>Symbol</label>
           <input list="alert-symbols" name="symbol" placeholder="AAPL" required />
-          <datalist id="alert-symbols">${UNIVERSE.map((s) => `<option value="${s.symbol}">`).join('')}</datalist>
+          <datalist id="alert-symbols">${getUniverse().map((s) => `<option value="${s.symbol}">`).join('')}</datalist>
         </div>
         <div class="filter-group">
           <label>Condition</label>
@@ -91,7 +91,7 @@ export function renderAlerts(container) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const symbol = fd.get('symbol').toString().trim().toUpperCase();
-    if (!UNIVERSE.find((s) => s.symbol === symbol)) {
+    if (!findUniverseStock(symbol)) {
       toast('Symbol not in universe', 'error');
       return;
     }

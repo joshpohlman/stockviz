@@ -1,5 +1,5 @@
 import { getCompareList, getQuotes, toggleCompare, clearCompare } from '../store.js';
-import { UNIVERSE } from '../data/universe.js';
+import { findUniverseStock } from '../data/universeStore.js';
 import { fmtPrice, fmtPct, fmtVolume, fmtMarketCap, changeClass } from '../utils/format.js';
 import { sparklineHtml } from '../utils/sparkline.js';
 import { drawSparkline } from '../utils/sparkline.js';
@@ -74,7 +74,7 @@ export function renderCompare(container) {
 
 function renderCompareTable(symbols, quotes) {
   const stocks = symbols.map((sym) => {
-    const meta = UNIVERSE.find((s) => s.symbol === sym);
+    const meta = findUniverseStock(sym);
     return { sym, q: quotes.get(sym), meta };
   });
 

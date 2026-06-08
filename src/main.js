@@ -8,7 +8,7 @@ import {
 } from './store.js';
 import { checkAlerts } from './alerts/alertEngine.js';
 import { toast } from './components/toast.js';
-import { UNIVERSE } from './data/universe.js';
+import { initUniverse, getUniverseMeta } from './data/universeStore.js';
 import { fmtPrice, fmtPct, changeClass, fmtTime } from './utils/format.js';
 import { patchLivePrices } from './utils/livePatch.js';
 import { initQuotePanel, openQuotePanel } from './components/quotePanel.js';
@@ -126,7 +126,8 @@ function updateStatus(source) {
     text.textContent = 'Update failed';
   } else if (source === 'fmp') {
     dot.className = 'status-dot live';
-    text.textContent = 'Live · FMP';
+    const uni = getUniverseMeta();
+    text.textContent = uni.source === 'sp500' ? `Live · FMP · ${uni.label}` : 'Live · FMP';
   } else if (source === 'finnhub') {
     dot.className = 'status-dot live';
     text.textContent = 'Live · Finnhub';
@@ -161,7 +162,7 @@ function updateFooterStats() {
   const patterns = rows.reduce((s, q) => s + (q.patterns?.length || 0), 0);
   const bullish = rows.filter((q) => q.prediction?.direction === 'bullish').length;
   el.innerHTML = `
-    <span>${UNIVERSE.length} symbols</span>
+    <span>${getUniverseMeta().label}</span>
     <span>${patterns} patterns</span>
     <span class="pos">${bullish} bullish</span>
   `;
@@ -273,15 +274,18 @@ function boot() {
 
   window.addEventListener('hashchange', () => { applyFiltersFromUrl(); navigate(); });
   window.addEventListener('stockviz:select', (e) => { setSelectedSymbol(e.detail); openQuotePanel(e.detail); });
-  window.addEventListener('stockviz:settings-saved', () => {
+  window.addEventListener('stockviz:settings-saved', async () => {
     stopPolling();
     tickerIndexCache = null;
+    await initUniverse(getSettings());
     loadTickerIndices();
     refreshQuotes().then(() => startPolling(refreshQuotes));
   });
 
   subscribe(onStoreChange);
-  refreshQuotes().then(() => { navigate(); startPolling(refreshQuotes); });
+  initUniverse(getSettings()).then(() => {
+    refreshQuotes().then(() => { navigate(); startPolling(refreshQuotes); });
+  });
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {});

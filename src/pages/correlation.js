@@ -1,5 +1,5 @@
 import { getQuotes, getFavorites } from '../store.js';
-import { UNIVERSE } from '../data/universe.js';
+
 import { buildCorrelationMatrix, correlationColor } from '../analysis/correlation.js';
 
 const DEFAULT_SETS = {

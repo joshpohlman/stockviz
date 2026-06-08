@@ -5,10 +5,13 @@ import {
 } from '../utils/notifications.js';
 import { clearMarketWidgetCache } from '../api/marketExtras.js';
 import { clearLiveAdvancedCache } from '../api/liveAdvanced.js';
+import { auditFmpEndpoints } from '../api/fmpHealth.js';
+import { getUniverseMeta, refreshUniverse } from '../data/universeStore.js';
 import { downloadSettingsBundle, copySettingsBundle, importFromEncoded } from '../utils/settingsBundle.js';
 
 export function renderSettings(container) {
   const s = getSettings();
+  const uni = getUniverseMeta();
 
   container.innerHTML = `
     <div class="page-header">
@@ -30,6 +33,22 @@ export function renderSettings(container) {
             FMP powers quotes, fundamentals, earnings calendar, insider trades, futures, and forex.
           </p>
           <p class="api-status" id="fmp-api-status"></p>
+          <div class="export-btn-row" style="margin-top:0.5rem">
+            <button type="button" class="btn-secondary" id="audit-fmp-api">Test All FMP Data</button>
+          </div>
+          <div id="fmp-audit-results" class="fmp-audit-results" hidden></div>
+        </div>
+
+        <div class="field">
+          <label>Stock Universe</label>
+          <p class="field-hint">
+            Current: <strong id="universe-label">${esc(uni.label)}</strong>
+            (${uni.source === 'sp500' ? 'loaded from FMP, cached 7 days' : 'bundled list — add FMP key for full S&amp;P 500'})
+          </p>
+          <div class="export-btn-row">
+            <button type="button" class="btn-secondary" id="refresh-universe" ${s.useMockData || !s.fmpApiKey?.trim() ? 'disabled' : ''}>Refresh S&amp;P 500 List</button>
+          </div>
+          <p class="field-hint">S&amp;P 500 uses ~13 batch quote calls on refresh. Use 60s+ refresh interval for large universes.</p>
         </div>
 
         <div class="field">
@@ -124,7 +143,7 @@ export function renderSettings(container) {
         <li><strong>Screener</strong> — filter by sector, change %, volume, market cap</li>
         <li><strong>Heat Map</strong> — sector treemap with live color updates</li>
         <li><strong>Quote Panel</strong> — click any ticker for details</li>
-        <li><strong>Extensible</strong> — add symbols in <code>src/data/universe.js</code></li>
+        <li><strong>S&amp;P 500</strong> — full index when FMP key is set (cached locally)</li>
       </ul>
     </section>
   `;
@@ -171,6 +190,56 @@ export function renderSettings(container) {
     const result = await validateFmpApiKey(key);
     status.textContent = result.message;
     status.className = `api-status ${result.valid ? 'ok' : 'err'}`;
+  });
+
+  container.querySelector('#audit-fmp-api')?.addEventListener('click', async () => {
+    const key = container.querySelector('#fmpApiKey').value;
+    const status = container.querySelector('#fmp-api-status');
+    const resultsEl = container.querySelector('#fmp-audit-results');
+    const btn = container.querySelector('#audit-fmp-api');
+    status.textContent = 'Running endpoint audit (~15 API calls)…';
+    status.className = 'api-status';
+    btn.disabled = true;
+    resultsEl.hidden = true;
+
+    const audit = await auditFmpEndpoints(key);
+    status.textContent = audit.message;
+    status.className = `api-status ${audit.valid ? 'ok' : 'err'}`;
+    resultsEl.hidden = false;
+    resultsEl.innerHTML = `
+      <table class="fmp-audit-table">
+        <thead><tr><th>Endpoint</th><th>Status</th><th>Time</th><th>Detail</th></tr></thead>
+        <tbody>
+          ${audit.results.map((r) => `
+            <tr class="${r.ok ? 'ok' : 'err'}">
+              <td>${esc(r.name)}</td>
+              <td>${r.ok ? '✓ Live' : '✗ Failed'}</td>
+              <td>${r.ms}ms</td>
+              <td>${esc(r.detail)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+    btn.disabled = false;
+  });
+
+  container.querySelector('#refresh-universe')?.addEventListener('click', async () => {
+    const btn = container.querySelector('#refresh-universe');
+    const label = container.querySelector('#universe-label');
+    btn.disabled = true;
+    btn.textContent = 'Loading…';
+    const settings = {
+      ...getSettings(),
+      fmpApiKey: container.querySelector('#fmpApiKey').value,
+      useMockData: container.querySelector('[name="useMockData"]').checked,
+    };
+    const meta = await refreshUniverse(settings);
+    label.textContent = meta.label;
+    btn.textContent = 'Refresh S&P 500 List';
+    btn.disabled = settings.useMockData || !settings.fmpApiKey?.trim();
+    showSaved(container, `Universe updated: ${meta.label}`);
+    window.dispatchEvent(new CustomEvent('stockviz:settings-saved'));
   });
 
   container.querySelector('#export-settings')?.addEventListener('click', () => downloadSettingsBundle());

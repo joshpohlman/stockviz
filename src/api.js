@@ -1,4 +1,4 @@
-import { UNIVERSE } from './data/universe.js';
+import { getUniverse, getUniverseMap, findUniverseStock } from './data/universeStore.js';
 import { enrichWithTA } from './analysis/enrich.js';
 import { mapFinnhubMetrics, mapFmpMetrics } from './analysis/fundamentals.js';
 import {
@@ -46,7 +46,7 @@ const SPARK_LEN = 24;
 
 function initMockPrices() {
   if (mockPrices.size) return;
-  for (const stock of UNIVERSE) {
+  for (const stock of getUniverse()) {
     const p = basePrice(stock.symbol);
     mockPrices.set(stock.symbol, p);
     const rand = seededRandom(stock.symbol + 'hist');
@@ -62,7 +62,7 @@ function initMockPrices() {
 
 function tickMockPrices() {
   initMockPrices();
-  for (const stock of UNIVERSE) {
+  for (const stock of getUniverse()) {
     const prev = mockPrices.get(stock.symbol);
     const drift = (Math.random() - 0.48) * prev * 0.008;
     const next = Math.max(1, prev + drift);
@@ -209,14 +209,15 @@ function enrichQuote(quote, meta, profile) {
 }
 
 export async function fetchAllQuotes(settings) {
-  const universeMap = new Map(UNIVERSE.map((s) => [s.symbol, s]));
-  const symbols = UNIVERSE.map((s) => s.symbol);
+  const universe = getUniverse();
+  const universeMap = getUniverseMap();
+  const symbols = universe.map((s) => s.symbol);
   const provider = getDataProvider(settings);
 
   if (provider === 'mock') {
     tickMockPrices();
     const quotes = new Map();
-    for (const stock of UNIVERSE) quotes.set(stock.symbol, enrichWithTA(buildMockQuote(stock)));
+    for (const stock of universe) quotes.set(stock.symbol, enrichWithTA(buildMockQuote(stock)));
     return { quotes, source: 'mock' };
   }
 
@@ -240,7 +241,7 @@ export async function fetchAllQuotes(settings) {
       console.warn('FMP batch quotes failed:', err);
     }
 
-    for (const stock of UNIVERSE) {
+    for (const stock of universe) {
       if (!quotes.has(stock.symbol)) quotes.set(stock.symbol, enrichWithTA(buildMockQuote(stock)));
     }
     return { quotes, source: 'fmp' };
@@ -270,7 +271,7 @@ export async function fetchAllQuotes(settings) {
     if (i + BATCH_SIZE < symbols.length) await delay(BATCH_DELAY_MS);
   }
 
-  for (const stock of UNIVERSE) {
+  for (const stock of universe) {
     if (!quotes.has(stock.symbol)) quotes.set(stock.symbol, enrichWithTA(buildMockQuote(stock)));
   }
 
@@ -286,7 +287,7 @@ async function fetchFinnhubMetrics(symbol, apiKey) {
 }
 
 export async function fetchSingleQuote(symbol, settings) {
-  const meta = UNIVERSE.find((s) => s.symbol === symbol);
+  const meta = findUniverseStock(symbol);
   const provider = getDataProvider(settings);
 
   if (provider === 'mock') {

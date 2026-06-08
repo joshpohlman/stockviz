@@ -281,30 +281,41 @@ export async function fetchFmpPriceTargetConsensus(symbol, apiKey) {
   return Array.isArray(data) ? data[0] : data;
 }
 
-export async function fetchFmpAnalystData(symbol, apiKey) {
-  const [grades, target] = await Promise.all([
-    fetchFmpGradesConsensus(symbol, apiKey).catch(() => null),
-    fetchFmpPriceTargetConsensus(symbol, apiKey).catch(() => null),
-  ]);
-  return mapFmpAnalyst(symbol, grades, target);
+export async function fetchFmpPriceTargetSummary(symbol, apiKey) {
+  const data = await fmpFetch('/price-target-summary', apiKey, { symbol: toFmpSymbol(symbol) });
+  return Array.isArray(data) ? data[0] : data;
 }
 
-function mapFmpAnalyst(symbol, grades, target) {
-  if (!grades && !target) return null;
-  const consensus = grades?.consensus || grades?.rating || 'Hold';
-  const targetPrice = target?.targetConsensus ?? target?.targetMedian ?? target?.lastTarget ?? null;
+export async function fetchFmpAnalystData(symbol, apiKey) {
+  const [grades, target, summary] = await Promise.all([
+    fetchFmpGradesConsensus(symbol, apiKey).catch(() => null),
+    fetchFmpPriceTargetConsensus(symbol, apiKey).catch(() => null),
+    fetchFmpPriceTargetSummary(symbol, apiKey).catch(() => null),
+  ]);
+  return mapFmpAnalyst(symbol, grades, target, summary);
+}
+
+function mapFmpAnalyst(symbol, grades, target, summary) {
+  if (!grades && !target && !summary) return null;
+  const consensus = grades?.consensus || grades?.rating || summary?.consensus || 'Hold';
+  const targetPrice = target?.targetConsensus
+    ?? target?.targetMedian
+    ?? target?.lastTarget
+    ?? summary?.lastMonthAvgPriceTarget
+    ?? summary?.allTimeAvgPriceTarget
+    ?? null;
   return {
     symbol,
     consensus,
     target: targetPrice,
-    numAnalysts: grades?.numberOfAnalysts ?? target?.numberOfAnalysts ?? 0,
+    numAnalysts: grades?.numberOfAnalysts ?? target?.numberOfAnalysts ?? summary?.numberOfAnalysts ?? 0,
     strongBuy: grades?.strongBuy ?? 0,
     buy: grades?.buy ?? 0,
     hold: grades?.hold ?? 0,
     sell: grades?.sell ?? 0,
     strongSell: grades?.strongSell ?? 0,
     revisions: (grades?.upgradesLastMonth ?? 0) - (grades?.downgradesLastMonth ?? 0),
-    lastUpdate: grades?.date || target?.lastUpdated || '—',
+    lastUpdate: grades?.date || target?.lastUpdated || summary?.lastUpdated || '—',
   };
 }
 
@@ -319,15 +330,41 @@ export async function fetchFmpBatchAnalyst(symbols, apiKey) {
   return results;
 }
 
+export async function fetchFmpSharesFloat(symbol, apiKey) {
+  const data = await fmpFetch('/shares-float', apiKey, { symbol: toFmpSymbol(symbol) });
+  return Array.isArray(data) ? data[0] : data;
+}
+
 export async function fetchFmpShortInterest(symbol, apiKey) {
-  const data = await fmpFetch('/short-interest', apiKey, { symbol: toFmpSymbol(symbol) });
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row) return null;
+  try {
+    const data = await fmpFetch('/short-interest', apiKey, { symbol: toFmpSymbol(symbol) });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row) {
+      return {
+        symbol,
+        shortPct: row.shortPercentOfFloat ?? row.shortInterest ?? 0,
+        daysToCover: row.daysToCover ?? row.shortRatio ?? 0,
+        change: row.change ?? 0,
+      };
+    }
+  } catch { /* plan may not include short-interest */ }
+
+  const [sharesFloat, metrics] = await Promise.all([
+    fetchFmpSharesFloat(symbol, apiKey).catch(() => null),
+    fetchFmpKeyMetricsTtm(symbol, apiKey).catch(() => null),
+  ]);
+  if (!sharesFloat && !metrics) return null;
+
+  let shortPct = sharesFloat?.shortPercentOfFloat ?? sharesFloat?.shortInterest ?? 0;
+  if (shortPct > 0 && shortPct < 1) shortPct *= 100;
+  const daysToCover = sharesFloat?.daysToCover ?? sharesFloat?.shortRatio ?? 0;
+  if (!shortPct && !daysToCover) return null;
+
   return {
     symbol,
-    shortPct: row.shortPercentOfFloat ?? row.shortInterest ?? 0,
-    daysToCover: row.daysToCover ?? row.shortRatio ?? 0,
-    change: row.change ?? 0,
+    shortPct,
+    daysToCover,
+    change: 0,
   };
 }
 
@@ -383,13 +420,46 @@ export async function fetchFmpFinancials(symbol, apiKey) {
   };
 }
 
+function mapSecFiling(f) {
+  return {
+    type: f.type || f.formType || f.form || 'Filing',
+    date: f.fillingDate?.slice(0, 10) || f.filingDate?.slice(0, 10) || f.date?.slice(0, 10) || '—',
+    url: f.finalLink || f.link || f.url || '#',
+    title: f.description || f.title || `${f.type || f.formType || 'SEC'} filing`,
+  };
+}
+
 export async function fetchFmpSecFilings(symbol, apiKey) {
-  const data = await fmpFetch('/sec-filings', apiKey, { symbol: toFmpSymbol(symbol), limit: 10 });
-  return (Array.isArray(data) ? data : []).map((f) => ({
-    type: f.type || f.formType || 'Filing',
-    date: f.fillingDate?.slice(0, 10) || f.date?.slice(0, 10) || '—',
-    url: f.finalLink || f.link || '#',
-    title: f.description || `${f.type || 'SEC'} filing`,
+  const sym = toFmpSymbol(symbol);
+  const to = new Date().toISOString().slice(0, 10);
+  const from = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+
+  const paths = [
+    ['/sec-filings-search/symbol', { symbol: sym, from, to, page: 0, limit: 10 }],
+    ['/sec-filings', { symbol: sym, limit: 10 }],
+  ];
+
+  for (const [path, params] of paths) {
+    try {
+      const data = await fmpFetch(path, apiKey, params);
+      const rows = Array.isArray(data) ? data : data?.filings || [];
+      if (rows.length) return rows.map(mapSecFiling);
+    } catch { /* try next path */ }
+  }
+  return [];
+}
+
+export async function fetchFmpSp500Constituents(apiKey) {
+  const data = await fmpFetch('/sp500-constituent', apiKey);
+  const rows = Array.isArray(data) ? data : [];
+  return rows.map((r) => ({
+    symbol: fromFmpSymbol(r.symbol),
+    name: r.name || r.companyName || r.symbol,
+    sector: r.sector || r.sectorName || '—',
+    industry: r.subSector || r.industry || r.subIndustry || '—',
+    subSector: r.subSector,
+    marketCap: r.marketCap || 0,
+    dateAdded: r.dateAdded || r.dateFirstAdded,
   }));
 }
 

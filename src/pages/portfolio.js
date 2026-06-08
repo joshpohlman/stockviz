@@ -1,5 +1,5 @@
 import { getPortfolio, getQuotes, addPortfolioHolding, removePortfolioHolding } from '../store.js';
-import { UNIVERSE } from '../data/universe.js';
+import { getUniverse, findUniverseStock } from '../data/universeStore.js';
 import { fmtPrice, fmtPct, fmtMarketCap, changeClass } from '../utils/format.js';
 import { toast } from '../components/toast.js';
 
@@ -55,7 +55,7 @@ export function renderPortfolio(container) {
         <div class="filter-group">
           <label>Symbol</label>
           <input list="symbol-list" name="symbol" placeholder="AAPL" required />
-          <datalist id="symbol-list">${UNIVERSE.map((s) => `<option value="${s.symbol}">`).join('')}</datalist>
+          <datalist id="symbol-list">${getUniverse().map((s) => `<option value="${s.symbol}">`).join('')}</datalist>
         </div>
         <div class="filter-group">
           <label>Shares</label>
@@ -88,7 +88,7 @@ export function renderPortfolio(container) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const symbol = fd.get('symbol').toString().trim().toUpperCase();
-    if (!UNIVERSE.find((s) => s.symbol === symbol)) {
+    if (!findUniverseStock(symbol)) {
       toast('Symbol not in universe', 'error');
       return;
     }

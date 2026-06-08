@@ -610,6 +610,22 @@ a:hover { text-decoration: underline; }
 .api-status.ok { color: var(--green); }
 .api-status.err { color: var(--red); }
 
+.fmp-audit-results { margin-top: 0.75rem; overflow-x: auto; }
+.fmp-audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.fmp-audit-table th,
+.fmp-audit-table td {
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.fmp-audit-table th { color: var(--text-muted); font-weight: 500; }
+.fmp-audit-table tr.ok td:nth-child(2) { color: var(--green); }
+.fmp-audit-table tr.err td:nth-child(2) { color: var(--red); }
+
 .btn-primary, .btn-secondary, .btn-ghost {
   padding: 0.45rem 1rem;
   border-radius: 4px;

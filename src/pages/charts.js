@@ -1,5 +1,5 @@
 import { getQuotes } from '../store.js';
-import { UNIVERSE } from '../data/universe.js';
+import { getUniverse } from '../data/universeStore.js';
 import { renderPriceChart } from '../components/chart.js';
 import { fmtPrice, fmtPct, changeClass } from '../utils/format.js';
 
@@ -18,7 +18,7 @@ export function renderCharts(container) {
     <div class="page-header charts-header">
       <h1>Advanced Charts</h1>
       <select id="chart-symbol" class="chart-select">
-        ${UNIVERSE.map((s) => `<option value="${s.symbol}" ${s.symbol === selected ? 'selected' : ''}>${s.symbol} — ${s.name}</option>`).join('')}
+        ${getUniverse().map((s) => `<option value="${s.symbol}" ${s.symbol === selected ? 'selected' : ''}>${s.symbol} — ${s.name}</option>`).join('')}
       </select>
     </div>
     ${q ? `

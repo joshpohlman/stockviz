@@ -1,5 +1,5 @@
 import { getQuotes, getMultiChartLayout, setMultiChartLayout, getFavorites } from '../store.js';
-import { UNIVERSE } from '../data/universe.js';
+import { getUniverse } from '../data/universeStore.js';
 import { renderPriceChart } from '../components/chart.js';
 import { fmtPrice, fmtPct, changeClass } from '../utils/format.js';
 
@@ -90,7 +90,7 @@ function renderChartCell(sym, q, idx) {
     <div class="mc-cell panel" data-symbol="${sym}" data-idx="${idx}">
       <div class="mc-cell-head">
         <select class="mc-sym-select sym" aria-label="Symbol">
-          ${UNIVERSE.map((s) => `<option value="${s.symbol}" ${s.symbol === sym ? 'selected' : ''}>${s.symbol}</option>`).join('')}
+          ${getUniverse().map((s) => `<option value="${s.symbol}" ${s.symbol === sym ? 'selected' : ''}>${s.symbol}</option>`).join('')}
         </select>
         <span class="mc-price ${cls}">${q ? `$${fmtPrice(q.price)} ${fmtPct(q.changePct)}` : '—'}</span>
       </div>

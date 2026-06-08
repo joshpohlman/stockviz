@@ -1,4 +1,4 @@
-import { UNIVERSE } from '../data/universe.js';
+import { getUniverse } from '../data/universeStore.js';
 import { getQuotes } from '../store.js';
 import { fmtPrice, fmtPct, changeClass } from '../utils/format.js';
 
@@ -57,7 +57,7 @@ export function closePalette() {
 function renderResults(query) {
   const q = query.trim().toLowerCase();
   const quotes = getQuotes();
-  results = UNIVERSE.filter((s) => {
+  results = getUniverse().filter((s) => {
     if (!q) return true;
     return s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q);
   }).slice(0, 12);
