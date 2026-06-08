@@ -1,4 +1,6 @@
-/** Shared filter logic — descriptive, fundamental, technical, signals, patterns. */
+import { evaluateFormula } from '../analysis/formula.js';
+
+/** Shared filter logic — descriptive, fundamental, technical, signals, patterns, formula. */
 export function applyFiltersFromQuotes(quotes, f) {
   const rows = [...quotes.values()];
   return rows.filter((q) => {
@@ -25,6 +27,8 @@ export function applyFiltersFromQuotes(quotes, f) {
     if (f.aboveSma50 === 'no' && q.ta?.sma50 && q.price > q.ta.sma50) return false;
     if (f.aboveSma200 === 'yes' && !(q.ta?.sma200 && q.price > q.ta.sma200)) return false;
     if (f.aboveSma200 === 'no' && q.ta?.sma200 && q.price > q.ta.sma200) return false;
+
+    if (f.formula && !evaluateFormula(f.formula, q)) return false;
 
     return true;
   });

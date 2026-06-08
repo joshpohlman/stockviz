@@ -1,5 +1,8 @@
 import { getSettings, updateSettings } from '../store.js';
 import { validateApiKey } from '../api.js';
+import {
+  isNotificationSupported, getNotificationPermission, requestNotificationPermission,
+} from '../utils/notifications.js';
 
 export function renderSettings(container) {
   const s = getSettings();
@@ -40,6 +43,24 @@ export function renderSettings(container) {
       </fieldset>
 
       <fieldset>
+        <legend>Notifications</legend>
+        <div class="field checkbox-field">
+          <label>
+            <input type="checkbox" name="pushNotifications" ${s.pushNotifications ? 'checked' : ''} ${!isNotificationSupported() ? 'disabled' : ''} />
+            Browser push notifications for alerts
+          </label>
+          ${isNotificationSupported() ? `<p class="field-hint">Permission: <strong>${getNotificationPermission()}</strong>
+            ${getNotificationPermission() === 'default' ? ' — save settings to request permission' : ''}</p>` : '<p class="field-hint">Not supported in this browser.</p>'}
+        </div>
+        <div class="field checkbox-field">
+          <label>
+            <input type="checkbox" name="alertSound" ${s.alertSound !== false ? 'checked' : ''} />
+            In-app toast notifications (always on when alerts fire)
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
         <legend>Watchlist</legend>
         <div class="field">
           <label for="watchlist">Symbols (comma-separated)</label>
@@ -63,7 +84,7 @@ export function renderSettings(container) {
   `;
 
   const form = container.querySelector('#settings-form');
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
     const watchlist = fd
@@ -72,12 +93,19 @@ export function renderSettings(container) {
       .map((x) => x.trim().toUpperCase())
       .filter(Boolean);
 
+    const pushNotifications = fd.get('pushNotifications') === 'on';
     updateSettings({
       apiKey: fd.get('apiKey'),
       refreshInterval: Number(fd.get('refreshInterval')) || 30,
       useMockData: fd.get('useMockData') === 'on',
       watchlist,
+      pushNotifications,
+      alertSound: fd.get('alertSound') === 'on',
     });
+
+    if (pushNotifications && getNotificationPermission() === 'default') {
+      await requestNotificationPermission();
+    }
 
     showSaved(container);
     window.dispatchEvent(new CustomEvent('stockviz:settings-saved'));

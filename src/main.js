@@ -31,11 +31,21 @@ import { renderSettings } from './pages/settings.js';
 import { renderMultiCharts } from './pages/multicharts.js';
 import { renderAlerts } from './pages/alerts.js';
 import { renderExportApi } from './pages/exportApi.js';
+import { renderDashboard } from './pages/dashboard.js';
+import { renderInternals } from './pages/internals.js';
+import { renderCorrelation } from './pages/correlation.js';
+import { renderBacktest } from './pages/backtest.js';
+import { renderOptions } from './pages/options.js';
+import { renderAnalyst } from './pages/analyst.js';
+import { renderRotation } from './pages/rotation.js';
+import { renderShorts } from './pages/shorts.js';
 import { applyFiltersFromUrl } from './utils/urlState.js';
 import { drawSparkline } from './utils/sparkline.js';
+import { sendNotification } from './utils/notifications.js';
 
 const routes = {
   '/': renderHome,
+  '/dashboard': renderDashboard,
   '/screener': renderScreener,
   '/map': renderMap,
   '/news': renderNews,
@@ -48,6 +58,13 @@ const routes = {
   '/multicharts': renderMultiCharts,
   '/alerts': renderAlerts,
   '/export': renderExportApi,
+  '/internals': renderInternals,
+  '/correlation': renderCorrelation,
+  '/backtest': renderBacktest,
+  '/options': renderOptions,
+  '/analyst': renderAnalyst,
+  '/rotation': renderRotation,
+  '/shorts': renderShorts,
   '/futures': renderFutures,
   '/calendar': renderCalendar,
   '/insider': renderInsider,
@@ -69,7 +86,16 @@ async function refreshQuotes() {
     setMarketStatus(status);
     updateStatus(source);
     const fired = checkAlerts(quotes);
-    fired.forEach((a) => toast(`Alert: ${a.symbol} — ${a.detail}`, 'success', 5000));
+    fired.forEach((a) => {
+      toast(`Alert: ${a.symbol} — ${a.detail}`, 'success', 5000);
+      if (settings.pushNotifications) {
+        sendNotification({
+          title: `StockViz: ${a.symbol}`,
+          body: a.detail,
+          tag: `alert-${a.id}`,
+        });
+      }
+    });
     updateAlertBadge();
   } catch (err) {
     console.error('Quote fetch failed:', err);

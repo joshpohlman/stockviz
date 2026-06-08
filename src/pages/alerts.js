@@ -1,5 +1,5 @@
 import {
-  getAlerts, addAlert, removeAlert, toggleAlert, clearTriggeredAlerts,
+  getAlerts, addAlert, removeAlert, toggleAlert, clearTriggeredAlerts, rearmAlert, rearmAllAlerts,
 } from '../store.js';
 import { UNIVERSE } from '../data/universe.js';
 import { ALERT_TYPES } from '../alerts/alertEngine.js';
@@ -51,7 +51,12 @@ export function renderAlerts(container) {
       <section class="panel">
         <div class="panel-title-row">
           <h2 class="panel-title">Triggered (${triggered.length})</h2>
-          ${triggered.length ? '<button class="btn-ghost btn-sm" id="clear-triggered">Clear All</button>' : ''}
+          ${triggered.length ? `
+            <div class="panel-actions">
+              <button class="btn-ghost btn-sm" id="rearm-all">Re-arm All</button>
+              <button class="btn-ghost btn-sm" id="clear-triggered">Clear All</button>
+            </div>
+          ` : ''}
         </div>
         ${triggered.length ? renderAlertTable(triggered, true) : '<p class="muted">None triggered yet.</p>'}
       </section>
@@ -101,6 +106,19 @@ export function renderAlerts(container) {
   });
 
   container.querySelector('#clear-triggered')?.addEventListener('click', clearTriggeredAlerts);
+  container.querySelector('#rearm-all')?.addEventListener('click', () => {
+    rearmAllAlerts();
+    toast('All triggered alerts re-armed', 'success');
+    renderAlerts(container);
+  });
+
+  container.querySelectorAll('[data-rearm]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      rearmAlert(btn.dataset.rearm);
+      toast('Alert re-armed', 'success');
+      renderAlerts(container);
+    });
+  });
 
   container.querySelectorAll('[data-del-alert]').forEach((btn) => {
     btn.addEventListener('click', () => removeAlert(btn.dataset.delAlert));
@@ -129,7 +147,7 @@ function renderAlertTable(alerts, triggered) {
             <td>${a.value}</td>
             <td>${triggered ? `<span class="pos">${a.triggerDetail || 'Triggered'}</span> <span class="muted">${fmtTime(a.triggeredAt)}</span>` : (a.active ? 'Watching' : 'Paused')}</td>
             <td>
-              ${!triggered ? `<button class="btn-ghost btn-sm" data-toggle-alert="${a.id}">${a.active ? 'Pause' : 'Resume'}</button>` : ''}
+              ${!triggered ? `<button class="btn-ghost btn-sm" data-toggle-alert="${a.id}">${a.active ? 'Pause' : 'Resume'}</button>` : `<button class="btn-ghost btn-sm" data-rearm="${a.id}">Re-arm</button>`}
               <button class="btn-ghost btn-sm" data-del-alert="${a.id}">×</button>
             </td>
           </tr>

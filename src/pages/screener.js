@@ -11,6 +11,7 @@ import { exportToCsv } from '../utils/export.js';
 import { buildShareUrl, syncFiltersToUrl } from '../utils/urlState.js';
 import { sparklineHtml } from '../utils/sparkline.js';
 import { debounce } from '../utils/debounce.js';
+import { FORMULA_EXAMPLES, validateFormula } from '../analysis/formula.js';
 
 export function renderScreener(container) {
   const filters = getFilters();
@@ -52,6 +53,7 @@ export function renderScreener(container) {
       <button type="button" class="screener-tab" data-tab="fund">Fundamental</button>
       <button type="button" class="screener-tab" data-tab="tech">Technical</button>
       <button type="button" class="screener-tab" data-tab="signals">Signals</button>
+      <button type="button" class="screener-tab" data-tab="formula">Formula</button>
     </div>
 
     <form class="filter-bar" id="filter-form">
@@ -79,6 +81,18 @@ export function renderScreener(container) {
       <div class="filter-panel" data-panel="signals" hidden>
         <div class="filter-group"><label>Signal</label><select name="signal"><option value="">Any</option>${SIGNAL_GROUPS.map((s) => `<option value="${s.id}" ${filters.signal === s.id ? 'selected' : ''}>${s.label}</option>`).join('')}</select></div>
         <div class="filter-group"><label>Pattern</label><select name="pattern"><option value="">Any</option>${PATTERN_GROUPS.map((p) => `<option value="${p.id}" ${filters.pattern === p.id ? 'selected' : ''}>${p.label}</option>`).join('')}</select></div>
+      </div>
+      <div class="filter-panel" data-panel="formula" hidden>
+        <div class="filter-group formula-group">
+          <label>Custom Formula</label>
+          <input type="text" name="formula" id="formula-input" placeholder="rsi < 35 and changePct > 0" value="${esc(filters.formula)}" />
+          <span class="formula-status ${validateFormula(filters.formula).valid ? 'ok' : filters.formula ? 'err' : ''}" id="formula-status">
+            ${filters.formula && !validateFormula(filters.formula).valid ? validateFormula(filters.formula).error : 'Fields: price, changePct, rsi, pe, relVolume, sma20, predConf…'}
+          </span>
+        </div>
+        <div class="formula-examples">
+          ${FORMULA_EXAMPLES.map((ex) => `<button type="button" class="preset-chip formula-chip" data-formula="${esc(ex.formula)}">${ex.label}</button>`).join('')}
+        </div>
       </div>
       <button type="button" class="btn-ghost" id="reset-filters">Reset</button>
       <button type="button" class="btn-ghost" id="save-filter">Save</button>
@@ -199,6 +213,16 @@ export function renderScreener(container) {
       const on = toggleFavorite(btn.dataset.fav);
       btn.textContent = on ? '★' : '☆';
       btn.classList.toggle('starred', on);
+    });
+  });
+
+  container.querySelectorAll('[data-formula]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const input = container.querySelector('#formula-input');
+      if (input) {
+        input.value = btn.dataset.formula;
+        updateFilters({ formula: btn.dataset.formula }, { preset: 'custom' });
+      }
     });
   });
 }

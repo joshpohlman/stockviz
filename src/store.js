@@ -4,6 +4,8 @@ const DEFAULT_SETTINGS = {
   useMockData: true,
   watchlist: ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA'],
   theme: 'dark',
+  pushNotifications: false,
+  alertSound: true,
 };
 
 const DEFAULT_FILTERS = {
@@ -23,6 +25,7 @@ const DEFAULT_FILTERS = {
   maxPe: '',
   aboveSma50: '',
   aboveSma200: '',
+  formula: '',
 };
 
 let settings = loadSettings();
@@ -290,6 +293,22 @@ export function markAlertTriggered(id, detail) {
 
 export function clearTriggeredAlerts() {
   alerts = alerts.filter((a) => !a.triggered);
+  persist('stockviz-alerts', alerts);
+  notify('alerts');
+}
+
+export function rearmAlert(id) {
+  alerts = alerts.map((a) => a.id === id
+    ? { ...a, triggered: false, triggeredAt: null, triggerDetail: null, active: true }
+    : a);
+  persist('stockviz-alerts', alerts);
+  notify('alerts');
+}
+
+export function rearmAllAlerts() {
+  alerts = alerts.map((a) => a.triggered
+    ? { ...a, triggered: false, triggeredAt: null, triggerDetail: null, active: true }
+    : a);
   persist('stockviz-alerts', alerts);
   notify('alerts');
 }
