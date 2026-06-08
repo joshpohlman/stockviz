@@ -17,6 +17,8 @@ if (!fs.existsSync(path.join(dist, '.git'))) {
   execSync('git init', { stdio: 'inherit' });
   execSync(`git remote add origin ${repo}`, { stdio: 'inherit' });
 }
+execSync('git config user.email "joshpohlman@users.noreply.github.com"', { stdio: 'inherit' });
+execSync('git config user.name "joshpohlman"', { stdio: 'inherit' });
 execSync('git add -A', { stdio: 'inherit' });
 try {
   execSync('git commit -m "Deploy StockViz"', { stdio: 'inherit' });
