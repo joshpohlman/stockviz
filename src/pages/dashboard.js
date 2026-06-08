@@ -1,10 +1,11 @@
 import { getQuotes, getSettings, getFavorites, getPortfolio } from '../store.js';
 import { getMarketBreadth } from '../analysis/enrich.js';
 import { computeSectorRotation, rotationPhase } from '../analysis/sectorRotation.js';
-import { generateOptionsFlow } from '../data/advancedData.js';
+import { fetchOptionsFlowData } from '../api/liveAdvanced.js';
+import { fetchMarketWidgets } from '../api.js';
 import { fmtPrice, fmtPct, changeClass } from '../utils/format.js';
 
-export function renderDashboard(container) {
+export async function renderDashboard(container) {
   const quotes = getQuotes();
   const settings = getSettings();
   const favorites = getFavorites();
@@ -12,7 +13,11 @@ export function renderDashboard(container) {
   const rows = [...quotes.values()];
   const breadth = getMarketBreadth(quotes);
   const rotation = computeSectorRotation(quotes).slice(0, 5);
-  const options = generateOptionsFlow(quotes, 6);
+  const [options, widgets] = await Promise.all([
+    fetchOptionsFlowData(settings, quotes, 6),
+    fetchMarketWidgets(settings).catch(() => null),
+  ]);
+  const earnings = widgets?.earnings?.slice(0, 4) || [];
   const bullish = rows.filter((q) => q.prediction?.direction === 'bullish')
     .sort((a, b) => (b.prediction?.confidence ?? 0) - (a.prediction?.confidence ?? 0)).slice(0, 6);
 
@@ -27,6 +32,7 @@ export function renderDashboard(container) {
         <a href="#/correlation" class="btn-secondary btn-sm">Correlation</a>
         <a href="#/backtest" class="btn-secondary btn-sm">Backtest</a>
         <a href="#/rotation" class="btn-secondary btn-sm">Rotation</a>
+        <a href="#/watchlist" class="btn-secondary btn-sm">Watchlist</a>
       </div>
     </div>
 
@@ -124,6 +130,25 @@ export function renderDashboard(container) {
         </table>
         <a href="#/options" class="widget-link">View all flow →</a>
       </section>
+
+      ${earnings.length ? `
+      <section class="panel dash-widget">
+        <h2 class="widget-title">Upcoming Earnings</h2>
+        <table class="data-table compact finviz-tbl">
+          <thead><tr><th>Symbol</th><th>Date</th><th>EPS Est</th></tr></thead>
+          <tbody>
+            ${earnings.map((e) => `
+              <tr class="clickable" data-symbol="${e.symbol}">
+                <td class="sym">${e.symbol}</td>
+                <td>${e.date}</td>
+                <td>$${fmtPrice(e.epsEst)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <a href="#/calendar" class="widget-link">Full calendar →</a>
+      </section>
+      ` : ''}
 
       <section class="panel dash-widget">
         <h2 class="widget-title">Portfolio Snapshot</h2>

@@ -17,6 +17,14 @@ export const PRESETS = [
   { id: 'bearish', label: 'Bearish Prediction', filters: { prediction: 'bearish' } },
   { id: 'tech', label: 'Technology', filters: { sector: 'Technology' } },
   { id: 'megacap', label: 'Mega Cap', filters: { minMarketCap: '200000000000' } },
+  { id: 'value', label: 'Value (Low P/E)', filters: { maxPe: '20', minDivYield: '1' } },
+  { id: 'growth', label: 'Growth (Low PEG)', filters: { maxPeg: '1.5', minChange: '0' } },
+  { id: 'dividend', label: 'Dividend', filters: { minDivYield: '2' } },
+  { id: 'momentum', label: 'Momentum', filters: { minChange: '2', aboveSma50: 'yes' } },
+  { id: 'rsi30', label: 'RSI Oversold', filters: { maxRsi: '30' } },
+  { id: 'rsi70', label: 'RSI Overbought', filters: { minRsi: '70' } },
+  { id: 'healthcare', label: 'Healthcare', filters: { sector: 'Healthcare' } },
+  { id: 'financial', label: 'Financial', filters: { sector: 'Financial' } },
 ];
 
 export { SIGNAL_GROUPS, PATTERN_GROUPS };

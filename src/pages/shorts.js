@@ -1,18 +1,20 @@
-import { getQuotes } from '../store.js';
-import { generateShortInterest } from '../data/advancedData.js';
+import { getQuotes, getSettings } from '../store.js';
+import { fetchShortInterestData } from '../api/liveAdvanced.js';
 import { fmtPrice, fmtPct, changeClass } from '../utils/format.js';
 
 let minSqueeze = 0;
 
-export function renderShorts(container) {
+export async function renderShorts(container) {
   const quotes = getQuotes();
-  let shorts = generateShortInterest(quotes);
+  const settings = getSettings();
+  let shorts = await fetchShortInterestData(settings, quotes);
+  const live = shorts.some((s) => s.live);
   if (minSqueeze > 0) shorts = shorts.filter((s) => s.squeezeScore >= minSqueeze);
 
   container.innerHTML = `
     <div class="page-header">
       <h1>Short Interest Scanner</h1>
-      <p class="page-sub">Short % of float, days to cover, and squeeze score ranking.</p>
+      <p class="page-sub">${live ? 'Live short interest from FMP.' : 'Simulated short data — add FMP key for live short interest.'}</p>
     </div>
 
     <div class="filter-chips">
@@ -25,28 +27,19 @@ export function renderShorts(container) {
     <div class="table-wrap">
       <table class="data-table finviz-tbl">
         <thead>
-          <tr>
-            <th>Symbol</th><th>Company</th><th>Sector</th><th>Price</th><th>Change</th>
-            <th>Short %</th><th>Days to Cover</th><th>Short Δ</th><th>Squeeze Score</th>
-          </tr>
+          <tr><th>Ticker</th><th>Price</th><th>Change</th><th>Short %</th><th>Days Cover</th><th>Short Chg</th><th>Squeeze</th><th>Sector</th></tr>
         </thead>
         <tbody>
-          ${shorts.slice(0, 60).map((s) => `
-            <tr class="clickable ${s.squeezeScore >= 70 ? 'row-highlight' : ''}" data-symbol="${s.symbol}">
+          ${shorts.map((s) => `
+            <tr class="clickable" data-symbol="${s.symbol}">
               <td class="sym">${s.symbol}</td>
-              <td>${s.name}</td>
-              <td>${s.sector}</td>
               <td>$${fmtPrice(s.price)}</td>
               <td class="${changeClass(s.changePct)}">${fmtPct(s.changePct)}</td>
-              <td class="${s.shortPct > 15 ? 'neg' : ''}">${s.shortPct}%</td>
-              <td>${s.daysToCover}</td>
-              <td class="${changeClass(s.change)}">${s.change > 0 ? '+' : ''}${s.change}%</td>
-              <td>
-                <div class="squeeze-cell">
-                  <div class="squeeze-bar"><div class="squeeze-fill" style="width:${s.squeezeScore}%"></div></div>
-                  <span>${s.squeezeScore}</span>
-                </div>
-              </td>
+              <td>${s.shortPct.toFixed(2)}%</td>
+              <td>${s.daysToCover.toFixed(1)}</td>
+              <td class="${changeClass(s.change)}">${s.change >= 0 ? '+' : ''}${s.change.toFixed(2)}%</td>
+              <td><span class="squeeze-badge ${s.squeezeScore >= 70 ? 'hot' : ''}">${s.squeezeScore}</span></td>
+              <td>${s.sector || '—'}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -60,6 +53,7 @@ export function renderShorts(container) {
       renderShorts(container);
     });
   });
+
   container.querySelectorAll('[data-symbol]').forEach((el) => {
     el.addEventListener('click', () => {
       window.dispatchEvent(new CustomEvent('stockviz:select', { detail: el.dataset.symbol }));

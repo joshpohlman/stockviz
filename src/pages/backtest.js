@@ -1,16 +1,24 @@
-import { getQuotes } from '../store.js';
+import { getQuotes, getSettings } from '../store.js';
 import { UNIVERSE } from '../data/universe.js';
 import { getStrategies, runBacktest, monteCarloProjection } from '../analysis/backtest.js';
+import { fetchCandles, getDataProvider } from '../api.js';
 import { fmtPrice, changeClass } from '../utils/format.js';
 
 let selectedSymbol = 'AAPL';
 let selectedStrategy = 'rsi_oversold';
+let cachedCandles = [];
 
-export function renderBacktest(container) {
+export async function renderBacktest(container) {
   const quotes = getQuotes();
+  const settings = getSettings();
   const q = quotes.get(selectedSymbol);
   const strategies = getStrategies();
-  const candles = q?.candles || [];
+  const live = getDataProvider(settings) !== 'mock';
+
+  container.innerHTML = '<div class="page-header"><h1>Strategy Backtester</h1><p class="page-sub">Loading historical data…</p></div>';
+
+  cachedCandles = await fetchCandles(selectedSymbol, settings, 'D', 120);
+  const candles = cachedCandles.length ? cachedCandles : (q?.candles || []);
   const result = runBacktest(candles, selectedStrategy);
   const monte = monteCarloProjection(candles);
 
@@ -18,7 +26,7 @@ export function renderBacktest(container) {
     <div class="page-header backtest-header">
       <div>
         <h1>Strategy Backtester</h1>
-        <p class="page-sub">Test TA strategies on historical candles with equity curve, Sharpe, and drawdown.</p>
+        <p class="page-sub">Test TA strategies on ${live ? 'live FMP' : 'simulated'} historical candles — equity curve, Sharpe, drawdown.</p>
       </div>
       <div class="backtest-controls">
         <select id="bt-symbol" class="chart-select">

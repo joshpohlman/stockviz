@@ -5,8 +5,10 @@ const DEFAULT_SETTINGS = {
   useMockData: true,
   watchlist: ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA'],
   theme: 'dark',
+  chartTheme: 'dark',
   pushNotifications: false,
   alertSound: true,
+  alertWebhookUrl: '',
 };
 
 const DEFAULT_FILTERS = {
@@ -37,6 +39,7 @@ let filters = { ...DEFAULT_FILTERS };
 let savedFilters = loadSavedFilters();
 let favorites = loadFavorites();
 let portfolio = loadPortfolio();
+let paperTrades = loadPaperTrades();
 let compareList = [];
 let alerts = loadAlerts();
 let multiChartLayout = loadMultiChartLayout();
@@ -89,6 +92,14 @@ function loadMultiChartLayout() {
     if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
   return { id: '2x2', symbols: ['AAPL', 'MSFT', 'NVDA', 'GOOGL'] };
+}
+
+function loadPaperTrades() {
+  try {
+    const raw = localStorage.getItem('stockviz-paper-trades');
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [];
 }
 
 function loadPortfolio() {
@@ -234,6 +245,45 @@ export function removePortfolioHolding(symbol) {
   portfolio = portfolio.filter((p) => p.symbol !== symbol);
   persist('stockviz-portfolio', portfolio);
   notify('portfolio');
+}
+
+export function getPaperTrades() {
+  return [...paperTrades];
+}
+
+export function addPaperTrade({ symbol, side, shares, entryPrice }) {
+  const entry = {
+    id: Date.now().toString(),
+    symbol: symbol.toUpperCase(),
+    side,
+    shares: Number(shares),
+    entryPrice: Number(entryPrice),
+    openedAt: Date.now(),
+    closedAt: null,
+    realizedPnl: null,
+  };
+  paperTrades = [...paperTrades, entry];
+  persist('stockviz-paper-trades', paperTrades);
+  notify('paper');
+  return entry;
+}
+
+export function closePaperTrade(id, exitPrice) {
+  paperTrades = paperTrades.map((t) => {
+    if (t.id !== id || t.closedAt) return t;
+    const pnl = t.side === 'long'
+      ? (exitPrice - t.entryPrice) * t.shares
+      : (t.entryPrice - exitPrice) * t.shares;
+    return { ...t, closedAt: Date.now(), exitPrice, realizedPnl: pnl };
+  });
+  persist('stockviz-paper-trades', paperTrades);
+  notify('paper');
+}
+
+export function removePaperTrade(id) {
+  paperTrades = paperTrades.filter((t) => t.id !== id);
+  persist('stockviz-paper-trades', paperTrades);
+  notify('paper');
 }
 
 export function getCompareList() {

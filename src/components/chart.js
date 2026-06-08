@@ -5,6 +5,12 @@ const DEFAULT_OPTS = {
   overlays: { sma20: true, sma50: false, sma200: false, bollinger: false },
   showVolume: true,
   showRsi: false,
+  theme: 'dark',
+};
+
+const THEMES = {
+  dark: { grid: 'rgba(48,54,61,0.5)', label: '#8b949e', up: '#3fb950', down: '#f85149' },
+  light: { grid: 'rgba(0,0,0,0.08)', label: '#57606a', up: '#1a7f37', down: '#cf222e' },
 };
 
 /** Advanced canvas chart — candles, SMA overlays, Bollinger, volume, RSI panel. */
@@ -69,7 +75,8 @@ export function renderPriceChart(container, candles, opts = {}) {
   const y = (v) => padY + chartH - ((v - yMin) / range) * chartH;
   const xAt = (i) => padX + i * step + step / 2;
 
-  drawGrid(ctx, w, padX, padY, chartH, mainH);
+  const pal = THEMES[options.theme] || THEMES.dark;
+  drawGrid(ctx, w, padX, padY, chartH, mainH, pal.grid);
 
   if (options.overlays.bollinger) {
     const bb = bollinger(closes);
@@ -92,7 +99,7 @@ export function renderPriceChart(container, candles, opts = {}) {
   candles.forEach((c, i) => {
     const cx = xAt(i);
     const up = c.c >= c.o;
-    const color = up ? '#3fb950' : '#f85149';
+    const color = up ? pal.up : pal.down;
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
     ctx.lineWidth = 1;
@@ -105,7 +112,7 @@ export function renderPriceChart(container, candles, opts = {}) {
     ctx.fillRect(cx - barW / 2, top, barW, Math.max(1, bot - top));
   });
 
-  ctx.fillStyle = '#8b949e';
+  ctx.fillStyle = pal.label;
   ctx.font = '10px IBM Plex Mono, monospace';
   ctx.textAlign = 'right';
   ctx.fillText(max.toFixed(2), w - 2, padY + 10);
@@ -116,8 +123,8 @@ export function renderPriceChart(container, candles, opts = {}) {
   if (hasRsi) drawRsiPanel(ctx, closes, w, mainH + volH, rsiH, padX, chartW, step);
 }
 
-function drawGrid(ctx, w, padX, padY, chartH, height) {
-  ctx.strokeStyle = 'rgba(48,54,61,0.6)';
+function drawGrid(ctx, w, padX, padY, chartH, height, gridColor = 'rgba(48,54,61,0.6)') {
+  ctx.strokeStyle = gridColor;
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const gy = padY + (chartH / 4) * i;

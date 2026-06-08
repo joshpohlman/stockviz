@@ -1495,3 +1495,59 @@ kbd {
 /* Alert panel actions */
 .panel-actions { display: flex; gap: 0.35rem; }
 .btn-sm { font-size: 0.68rem !important; padding: 0.2rem 0.45rem !important; }
+
+/* Quote tabs & extras */
+.quote-tabs { display: flex; gap: 0.25rem; margin: 0.5rem 0; flex-wrap: wrap; }
+.quote-tab { background: var(--bg); border: 1px solid var(--border); color: var(--text-muted); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.72rem; }
+.quote-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,0.1); }
+.quote-tab-panel { display: none; }
+.quote-tab-panel.active { display: block; }
+.quote-extended { display: block; font-size: 0.75rem; color: var(--yellow); margin-top: 0.2rem; }
+.filings-list { list-style: none; padding: 0; margin: 0; }
+.filings-list li { border-bottom: 1px solid var(--border); }
+.filings-list a { display: grid; grid-template-columns: 60px 80px 1fr; gap: 0.5rem; padding: 0.5rem; text-decoration: none; color: var(--text); font-size: 0.78rem; }
+.filings-list a:hover { background: var(--bg-elevated); }
+.filing-type { font-weight: 600; color: var(--accent); }
+.ai-summary-text { font-size: 0.85rem; line-height: 1.55; }
+.fin-stmt-tbl { margin-bottom: 1rem; }
+
+/* Watchlist */
+.watchlist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem; }
+.watchlist-card { cursor: pointer; }
+.wl-head { display: flex; justify-content: space-between; align-items: center; }
+.wl-name { font-size: 0.72rem; color: var(--text-muted); margin: 0.2rem 0; }
+.wl-price { font-size: 1.1rem; font-weight: 700; font-family: var(--mono); }
+.wl-meta { display: flex; gap: 0.75rem; font-size: 0.68rem; color: var(--text-muted); margin-top: 0.35rem; }
+.wl-signal { font-size: 0.68rem; color: var(--accent); margin-top: 0.25rem; display: block; }
+
+/* Paper trading */
+.paper-summary { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+.paper-form { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; margin-bottom: 0.75rem; }
+
+/* Formula builder */
+.formula-builder { margin-top: 0.5rem; }
+.fb-row { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-bottom: 0.5rem; }
+.fb-preview { background: var(--bg); padding: 0.5rem; border-radius: 4px; margin-bottom: 0.5rem; }
+.fb-preview code { font-family: var(--mono); font-size: 0.8rem; }
+.fb-actions { display: flex; gap: 0.35rem; }
+
+/* Keyboard help */
+.kbd-help-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+.kbd-help { max-width: 360px; padding: 1rem; }
+.kbd-help ul { list-style: none; padding: 0; font-size: 0.8rem; }
+.kbd-help li { padding: 0.25rem 0; }
+.squeeze-badge { font-family: var(--mono); font-weight: 600; }
+.squeeze-badge.hot { color: var(--red); }
+
+/* Mobile improvements */
+@media (max-width: 768px) {
+  .finviz-nav { flex-direction: column; max-height: 70vh; overflow-y: auto; }
+  .finviz-nav.open { display: flex; }
+  .main-nav:not(.open) { display: none; }
+  .home-main-grid, .home-bottom-grid, .dash-grid, .three-col, .two-col { grid-template-columns: 1fr !important; }
+  .screener-table { font-size: 0.68rem; }
+  .quote-panel { width: 100%; max-width: 100%; }
+  .watchlist-grid { grid-template-columns: 1fr 1fr; }
+  .header-status { display: none; }
+  .ticker-bar { overflow-x: auto; flex-wrap: nowrap; }
+}

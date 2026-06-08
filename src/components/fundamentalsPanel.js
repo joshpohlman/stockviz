@@ -36,7 +36,7 @@ export function renderFundamentalsPanel(quote, container) {
           </section>
         `).join('')}
       </div>
-      <p class="fund-disclaimer">Fundamental data — simulated unless Finnhub API key provides live metrics.</p>
+      <p class="fund-disclaimer">Fundamental data from FMP or Finnhub when API key is set; otherwise simulated.</p>
     </div>
   `;
 

@@ -1,10 +1,14 @@
 import { fetchSingleQuote, fetchCandles, fetchCompanyNews, fetchStockMetrics, getDataProvider } from '../api.js';
+import { fetchStockFinancials, fetchStockFilings, fetchExtendedHours } from '../api/liveAdvanced.js';
 import { getSettings, getQuotes, setSelectedSymbol, toggleFavorite, isFavorite, toggleCompare, getCompareList, addAlert } from '../store.js';
 import { enrichWithTA } from '../analysis/enrich.js';
 import { fmtPrice, fmtChange, fmtPct, fmtVolume, fmtMarketCap, changeClass } from '../utils/format.js';
 import { renderPriceChart } from './chart.js';
 import { renderFundamentalsPanel } from './fundamentalsPanel.js';
+import { renderFinancialsStatements, renderFilingsList, renderAiSummaryPanel } from './quoteExtras.js';
 import { toast } from './toast.js';
+
+let quoteTab = 'overview';
 
 let panelEl, bodyEl, overlayEl, closeBtn;
 
@@ -43,10 +47,13 @@ export function closeQuotePanel() {
 async function loadQuote(symbol) {
   const settings = getSettings();
   const cached = getQuotes().get(symbol);
-  const [fetched, news, metrics] = await Promise.all([
+  const [fetched, news, metrics, financials, filings, extended] = await Promise.all([
     cached?.fundamentals?.peg != null ? Promise.resolve(cached) : fetchSingleQuote(symbol, settings),
     fetchCompanyNews(symbol, settings),
     fetchStockMetrics(symbol, settings),
+    fetchStockFinancials(symbol, settings),
+    fetchStockFilings(symbol, settings),
+    fetchExtendedHours(symbol, settings),
   ]);
 
   let quote = fetched;
@@ -85,9 +92,17 @@ async function loadQuote(symbol) {
       <div class="quote-price-block" data-live-symbol="${symbol}">
         <span class="quote-price" data-live="price">$${fmtPrice(quote.price)}</span>
         <span class="quote-change ${cls}" data-live="pct">${fmtChange(quote.change)} (${fmtPct(quote.changePct)})</span>
+        ${extended ? `<span class="quote-extended">After-hours: $${fmtPrice(extended.price)} (${fmtPct(extended.changePct)})</span>` : ''}
       </div>
     </div>
 
+    <div class="quote-tabs" role="tablist">
+      ${['overview', 'financials', 'filings', 'summary'].map((t) => `
+        <button type="button" class="quote-tab ${quoteTab === t ? 'active' : ''}" data-qtab="${t}">${t === 'summary' ? 'AI Summary' : t.charAt(0).toUpperCase() + t.slice(1)}</button>
+      `).join('')}
+    </div>
+
+    <div class="quote-tab-panel ${quoteTab === 'overview' ? 'active' : ''}" data-qpanel="overview">
     <div class="quote-key-metrics">
       <div class="qkm"><span class="qkm-label">Mkt Cap</span><span class="qkm-val">${fmtMarketCap(quote.marketCap)}</span></div>
       <div class="qkm"><span class="qkm-label">P/E</span><span class="qkm-val">${f.pe ?? '—'}</span></div>
@@ -109,8 +124,19 @@ async function loadQuote(symbol) {
     </div>
 
     <div id="fundamentals-host"></div>
+    </div>
 
-    ${quote.prediction ? `
+    <div class="quote-tab-panel ${quoteTab === 'financials' ? 'active' : ''}" data-qpanel="financials">
+      <div id="financials-host"></div>
+    </div>
+    <div class="quote-tab-panel ${quoteTab === 'filings' ? 'active' : ''}" data-qpanel="filings">
+      <div id="filings-host"></div>
+    </div>
+    <div class="quote-tab-panel ${quoteTab === 'summary' ? 'active' : ''}" data-qpanel="summary">
+      <div id="summary-host"></div>
+    </div>
+
+    ${quoteTab === 'overview' && quote.prediction ? `
     <div class="prediction-panel panel">
       <h3 class="quote-section-title">AI Pattern Prediction</h3>
       <div class="pred-header">
@@ -134,7 +160,7 @@ async function loadQuote(symbol) {
     </div>
     ` : ''}
 
-    <div class="quote-chart-section">
+    ${quoteTab === 'overview' ? `<div class="quote-chart-section">
       <h3 class="quote-section-title">Price Chart (60D)</h3>
       <div id="quote-chart" class="quote-chart-host"></div>
     </div>
@@ -149,11 +175,27 @@ async function loadQuote(symbol) {
           </a>
         `).join('')}
       </div>
-    </div>
+    </div>` : ''}
   `;
 
   const fundHost = bodyEl.querySelector('#fundamentals-host');
-  if (fundHost) renderFundamentalsPanel(quote, fundHost);
+  if (fundHost && quoteTab === 'overview') renderFundamentalsPanel(quote, fundHost);
+
+  const finHost = bodyEl.querySelector('#financials-host');
+  if (finHost) renderFinancialsStatements(financials, finHost);
+
+  const filHost = bodyEl.querySelector('#filings-host');
+  if (filHost) renderFilingsList(filings, filHost);
+
+  const sumHost = bodyEl.querySelector('#summary-host');
+  if (sumHost) renderAiSummaryPanel(quote, news, sumHost);
+
+  bodyEl.querySelectorAll('[data-qtab]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      quoteTab = btn.dataset.qtab;
+      loadQuote(symbol);
+    });
+  });
 
   bodyEl.querySelector('#qa-alert')?.addEventListener('click', () => {
     const type = prompt('Alert type: price_above, price_below, change_above, rsi_above, prediction\n(or visit Alerts page)', 'price_above');
@@ -185,9 +227,10 @@ async function loadQuote(symbol) {
   });
 
   const chartHost = bodyEl.querySelector('#quote-chart');
+  const chartTheme = getSettings().chartTheme || 'dark';
   if (chartHost) {
-    renderPriceChart(chartHost, candles, { height: 180, showVolume: true });
-    const ro = new ResizeObserver(() => renderPriceChart(chartHost, candles, { height: 180, showVolume: true }));
+    renderPriceChart(chartHost, candles, { height: 180, showVolume: true, theme: chartTheme });
+    const ro = new ResizeObserver(() => renderPriceChart(chartHost, candles, { height: 180, showVolume: true, theme: chartTheme }));
     ro.observe(chartHost);
   }
 }

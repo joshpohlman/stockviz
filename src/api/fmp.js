@@ -271,6 +271,181 @@ export async function validateFmpApiKey(apiKey) {
   }
 }
 
+export async function fetchFmpGradesConsensus(symbol, apiKey) {
+  const data = await fmpFetch('/grades-consensus', apiKey, { symbol: toFmpSymbol(symbol) });
+  return Array.isArray(data) ? data[0] : data;
+}
+
+export async function fetchFmpPriceTargetConsensus(symbol, apiKey) {
+  const data = await fmpFetch('/price-target-consensus', apiKey, { symbol: toFmpSymbol(symbol) });
+  return Array.isArray(data) ? data[0] : data;
+}
+
+export async function fetchFmpAnalystData(symbol, apiKey) {
+  const [grades, target] = await Promise.all([
+    fetchFmpGradesConsensus(symbol, apiKey).catch(() => null),
+    fetchFmpPriceTargetConsensus(symbol, apiKey).catch(() => null),
+  ]);
+  return mapFmpAnalyst(symbol, grades, target);
+}
+
+function mapFmpAnalyst(symbol, grades, target) {
+  if (!grades && !target) return null;
+  const consensus = grades?.consensus || grades?.rating || 'Hold';
+  const targetPrice = target?.targetConsensus ?? target?.targetMedian ?? target?.lastTarget ?? null;
+  return {
+    symbol,
+    consensus,
+    target: targetPrice,
+    numAnalysts: grades?.numberOfAnalysts ?? target?.numberOfAnalysts ?? 0,
+    strongBuy: grades?.strongBuy ?? 0,
+    buy: grades?.buy ?? 0,
+    hold: grades?.hold ?? 0,
+    sell: grades?.sell ?? 0,
+    strongSell: grades?.strongSell ?? 0,
+    revisions: (grades?.upgradesLastMonth ?? 0) - (grades?.downgradesLastMonth ?? 0),
+    lastUpdate: grades?.date || target?.lastUpdated || '—',
+  };
+}
+
+export async function fetchFmpBatchAnalyst(symbols, apiKey) {
+  const results = [];
+  for (let i = 0; i < symbols.length; i += 5) {
+    const chunk = symbols.slice(i, i + 5);
+    const rows = await Promise.all(chunk.map((s) => fetchFmpAnalystData(s, apiKey).catch(() => null)));
+    for (const r of rows) if (r) results.push(r);
+    if (i + 5 < symbols.length) await delay(300);
+  }
+  return results;
+}
+
+export async function fetchFmpShortInterest(symbol, apiKey) {
+  const data = await fmpFetch('/short-interest', apiKey, { symbol: toFmpSymbol(symbol) });
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return {
+    symbol,
+    shortPct: row.shortPercentOfFloat ?? row.shortInterest ?? 0,
+    daysToCover: row.daysToCover ?? row.shortRatio ?? 0,
+    change: row.change ?? 0,
+  };
+}
+
+export async function fetchFmpBatchShortInterest(symbols, apiKey) {
+  const results = [];
+  for (let i = 0; i < symbols.length; i += 5) {
+    const chunk = symbols.slice(i, i + 5);
+    const rows = await Promise.all(chunk.map((s) => fetchFmpShortInterest(s, apiKey).catch(() => null)));
+    for (const r of rows) if (r) results.push(r);
+    if (i + 5 < symbols.length) await delay(300);
+  }
+  return results;
+}
+
+export async function fetchFmpOptionsChain(symbol, apiKey) {
+  const data = await fmpFetch('/options-chain', apiKey, { symbol: toFmpSymbol(symbol) });
+  const rows = Array.isArray(data) ? data : data?.options || [];
+  return rows.slice(0, 30).map((o) => ({
+    symbol,
+    type: o.type === 'call' ? 'Call' : 'Put',
+    strike: o.strike ?? 0,
+    expiry: o.expirationDate?.slice(5) || o.expiration || '—',
+    premium: o.last ?? o.bid ?? 0,
+    contracts: o.volume ?? o.openInterest ?? 0,
+    notional: (o.volume ?? 0) * (o.last ?? 0) * 100,
+    sentiment: o.type === 'call' ? 'bullish' : 'bearish',
+    unusual: (o.volume ?? 0) > 1000,
+  }));
+}
+
+export async function fetchFmpBatchOptions(symbols, apiKey, limit = 40) {
+  const top = symbols.slice(0, 12);
+  const all = [];
+  for (const sym of top) {
+    const chain = await fetchFmpOptionsChain(sym, apiKey).catch(() => []);
+    const unusual = chain.filter((o) => o.unusual).sort((a, b) => b.notional - a.notional).slice(0, 4);
+    all.push(...unusual);
+    await delay(200);
+  }
+  return all.sort((a, b) => b.notional - a.notional).slice(0, limit);
+}
+
+export async function fetchFmpFinancials(symbol, apiKey) {
+  const [income, balance, cash] = await Promise.all([
+    fmpFetch('/income-statement', apiKey, { symbol: toFmpSymbol(symbol), period: 'annual', limit: 4 }).catch(() => []),
+    fmpFetch('/balance-sheet-statement', apiKey, { symbol: toFmpSymbol(symbol), period: 'annual', limit: 4 }).catch(() => []),
+    fmpFetch('/cash-flow-statement', apiKey, { symbol: toFmpSymbol(symbol), period: 'annual', limit: 4 }).catch(() => []),
+  ]);
+  return {
+    income: (Array.isArray(income) ? income : []).slice(0, 4),
+    balance: (Array.isArray(balance) ? balance : []).slice(0, 4),
+    cash: (Array.isArray(cash) ? cash : []).slice(0, 4),
+  };
+}
+
+export async function fetchFmpSecFilings(symbol, apiKey) {
+  const data = await fmpFetch('/sec-filings', apiKey, { symbol: toFmpSymbol(symbol), limit: 10 });
+  return (Array.isArray(data) ? data : []).map((f) => ({
+    type: f.type || f.formType || 'Filing',
+    date: f.fillingDate?.slice(0, 10) || f.date?.slice(0, 10) || '—',
+    url: f.finalLink || f.link || '#',
+    title: f.description || `${f.type || 'SEC'} filing`,
+  }));
+}
+
+export async function fetchFmpDividendCalendar(apiKey) {
+  const from = new Date().toISOString().slice(0, 10);
+  const to = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const data = await fmpFetch('/dividends-calendar', apiKey, { from, to });
+  return (Array.isArray(data) ? data : []).slice(0, 50).map((d) => ({
+    symbol: d.symbol,
+    date: d.date?.slice(0, 10) || d.paymentDate?.slice(0, 10) || '—',
+    exDate: d.exDividendDate?.slice(0, 10) || d.date?.slice(0, 10) || '—',
+    amount: d.dividend ?? d.adjDividend ?? 0,
+    yield: d.yield ?? null,
+  }));
+}
+
+export async function fetchFmpExtendedQuote(symbol, apiKey) {
+  try {
+    const data = await fmpFetch('/aftermarket-quote', apiKey, { symbol: toFmpSymbol(symbol) });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row?.price) return null;
+    return {
+      price: row.price,
+      change: row.change ?? 0,
+      changePct: row.changesPercentage ?? row.changePercentage ?? 0,
+      session: 'after-hours',
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchFmpIndexTickerQuotes(apiKey) {
+  const data = await fmpFetch('/batch-index-quotes', apiKey);
+  const map = {
+    '^GSPC': { symbol: 'SPY', label: 'S&P 500' },
+    '^IXIC': { symbol: 'QQQ', label: 'NASDAQ' },
+    '^DJI': { symbol: 'DIA', label: 'DOW' },
+    '^RUT': { symbol: 'IWM', label: 'RUSSELL 2K' },
+  };
+  const indices = Array.isArray(data) ? data : [];
+  const out = new Map();
+  for (const q of indices) {
+    const meta = map[q.symbol];
+    if (!meta) continue;
+    out.set(meta.symbol, {
+      symbol: meta.symbol,
+      label: meta.label,
+      price: q.price ?? 0,
+      change: q.change ?? 0,
+      changePct: q.changesPercentage ?? q.changePercentage ?? 0,
+    });
+  }
+  return out;
+}
+
 /** Fetch all home-page widget data in one parallel batch. */
 export async function fetchFmpMarketWidgets(apiKey) {
   const [earnings, economic, insider, commodities, forex, indices, treasury] = await Promise.all([

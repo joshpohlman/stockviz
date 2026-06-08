@@ -39,6 +39,12 @@ import { renderOptions } from './pages/options.js';
 import { renderAnalyst } from './pages/analyst.js';
 import { renderRotation } from './pages/rotation.js';
 import { renderShorts } from './pages/shorts.js';
+import { renderWatchlist } from './pages/watchlist.js';
+import { renderDividends } from './pages/dividends.js';
+import { renderPaperTrading } from './pages/paperTrading.js';
+import { fetchTickerIndices } from './api/liveAdvanced.js';
+import { initKeyboardShortcuts } from './utils/keyboard.js';
+import { deliverAlertWebhook } from './utils/alertDelivery.js';
 import { applyFiltersFromUrl } from './utils/urlState.js';
 import { drawSparkline } from './utils/sparkline.js';
 import { sendNotification } from './utils/notifications.js';
@@ -69,6 +75,9 @@ const routes = {
   '/calendar': renderCalendar,
   '/insider': renderInsider,
   '/settings': renderSettings,
+  '/watchlist': renderWatchlist,
+  '/dividends': renderDividends,
+  '/paper': renderPaperTrading,
 };
 
 const PATCH_ONLY = new Set(['quotes', 'status']);
@@ -95,6 +104,7 @@ async function refreshQuotes() {
           tag: `alert-${a.id}`,
         });
       }
+      deliverAlertWebhook(settings, a);
     });
     updateAlertBadge();
   } catch (err) {
@@ -157,19 +167,32 @@ function updateFooterStats() {
   `;
 }
 
+let tickerIndexCache = null;
+
+async function loadTickerIndices() {
+  const settings = getSettings();
+  const indices = await fetchTickerIndices(settings).catch(() => null);
+  if (indices?.size) tickerIndexCache = indices;
+}
+
 function renderTickerBar() {
   const bar = document.getElementById('ticker-bar');
   const quotes = getQuotes();
-  bar.innerHTML = ['SPY', 'QQQ', 'DIA', 'IWM'].map((symbol) => {
-    const labels = { SPY: 'S&P 500', QQQ: 'NASDAQ', DIA: 'DOW', IWM: 'RUSSELL 2K' };
-    const q = quotes.get(symbol);
+  const symbols = ['SPY', 'QQQ', 'DIA', 'IWM'];
+  const labels = { SPY: 'S&P 500', QQQ: 'NASDAQ', DIA: 'DOW', IWM: 'RUSSELL 2K' };
+
+  bar.innerHTML = symbols.map((symbol) => {
+    const live = tickerIndexCache?.get(symbol);
+    const q = live || quotes.get(symbol);
     if (!q) return '';
     const cls = changeClass(q.changePct);
+    const price = q.price;
+    const changePct = q.changePct;
     return `
       <span class="ticker-item" data-live-symbol="${symbol}">
-        <span class="ticker-label">${labels[symbol]}</span>
-        <span class="ticker-price" data-live="price">$${fmtPrice(q.price)}</span>
-        <span class="ticker-chg ${cls}" data-live="pct">${fmtPct(q.changePct)}</span>
+        <span class="ticker-label">${live?.label || labels[symbol]}</span>
+        <span class="ticker-price" data-live="price">$${fmtPrice(price)}</span>
+        <span class="ticker-chg ${cls}" data-live="pct">${fmtPct(changePct)}</span>
       </span>
     `;
   }).join('');
@@ -239,6 +262,8 @@ function boot() {
   initQuotePanel();
   initCommandPalette();
   initToast();
+  initKeyboardShortcuts();
+  loadTickerIndices();
   document.getElementById('nav-toggle')?.addEventListener('click', () => {
     document.querySelector('.main-nav')?.classList.toggle('open');
   });
@@ -250,11 +275,17 @@ function boot() {
   window.addEventListener('stockviz:select', (e) => { setSelectedSymbol(e.detail); openQuotePanel(e.detail); });
   window.addEventListener('stockviz:settings-saved', () => {
     stopPolling();
+    tickerIndexCache = null;
+    loadTickerIndices();
     refreshQuotes().then(() => startPolling(refreshQuotes));
   });
 
   subscribe(onStoreChange);
   refreshQuotes().then(() => { navigate(); startPolling(refreshQuotes); });
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {});
+  }
 }
 
 boot();

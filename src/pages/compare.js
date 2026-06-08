@@ -9,9 +9,15 @@ const METRICS = [
   { key: 'changePct', label: 'Change %', fmt: (q) => fmtPct(q.changePct), cls: (q) => changeClass(q.changePct) },
   { key: 'volume', label: 'Volume', fmt: (q) => fmtVolume(q.volume) },
   { key: 'marketCap', label: 'Market Cap', fmt: (q) => fmtMarketCap(q.marketCap) },
-  { key: 'open', label: 'Open', fmt: (q) => `$${fmtPrice(q.open)}` },
-  { key: 'high', label: 'High', fmt: (q) => `$${fmtPrice(q.high)}` },
-  { key: 'low', label: 'Low', fmt: (q) => `$${fmtPrice(q.low)}` },
+  { key: 'pe', label: 'P/E (TTM)', fmt: (q) => q.fundamentals?.pe ?? '—' },
+  { key: 'peg', label: 'PEG', fmt: (q) => q.fundamentals?.peg ?? '—' },
+  { key: 'eps', label: 'EPS', fmt: (q) => q.fundamentals?.eps != null ? q.fundamentals.eps.toFixed(2) : '—' },
+  { key: 'ps', label: 'P/S', fmt: (q) => q.fundamentals?.ps ?? '—' },
+  { key: 'pb', label: 'P/B', fmt: (q) => q.fundamentals?.pb ?? '—' },
+  { key: 'div', label: 'Div Yield', fmt: (q) => q.fundamentals?.dividendYield != null ? `${q.fundamentals.dividendYield}%` : '—' },
+  { key: 'beta', label: 'Beta', fmt: (q) => q.fundamentals?.beta ?? '—' },
+  { key: 'rsi', label: 'RSI', fmt: (q) => q.ta?.rsi?.toFixed(1) ?? '—' },
+  { key: 'prediction', label: 'Prediction', fmt: (q) => q.prediction ? `${q.prediction.direction} ${q.prediction.confidence}%` : '—', cls: (q) => q.prediction?.direction === 'bullish' ? 'pos' : q.prediction?.direction === 'bearish' ? 'neg' : '' },
   { key: 'sector', label: 'Sector', fmt: (q) => q.sector || '—' },
 ];
 

@@ -12,6 +12,7 @@ import { buildShareUrl, syncFiltersToUrl } from '../utils/urlState.js';
 import { sparklineHtml } from '../utils/sparkline.js';
 import { debounce } from '../utils/debounce.js';
 import { FORMULA_EXAMPLES, validateFormula } from '../analysis/formula.js';
+import { renderFormulaBuilder } from '../components/formulaBuilder.js';
 
 export function renderScreener(container) {
   const filters = getFilters();
@@ -96,6 +97,7 @@ export function renderScreener(container) {
         <div class="formula-examples">
           ${FORMULA_EXAMPLES.map((ex) => `<button type="button" class="preset-chip formula-chip" data-formula="${esc(ex.formula)}">${ex.label}</button>`).join('')}
         </div>
+        <div id="formula-builder-host"></div>
       </div>
       <button type="button" class="btn-ghost" id="reset-filters">Reset</button>
       <button type="button" class="btn-ghost" id="save-filter">Save</button>
@@ -223,6 +225,18 @@ export function renderScreener(container) {
       btn.classList.toggle('starred', on);
     });
   });
+
+  const fbHost = container.querySelector('#formula-builder-host');
+  if (fbHost) {
+    renderFormulaBuilder(fbHost, {
+      current: filters.formula,
+      onApply: (formula) => {
+        const input = container.querySelector('#formula-input');
+        if (input) input.value = formula;
+        updateFilters({ formula }, { preset: 'custom' });
+      },
+    });
+  }
 
   container.querySelectorAll('[data-formula]').forEach((btn) => {
     btn.addEventListener('click', () => {

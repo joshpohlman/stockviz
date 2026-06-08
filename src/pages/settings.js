@@ -4,6 +4,8 @@ import {
   isNotificationSupported, getNotificationPermission, requestNotificationPermission,
 } from '../utils/notifications.js';
 import { clearMarketWidgetCache } from '../api/marketExtras.js';
+import { clearLiveAdvancedCache } from '../api/liveAdvanced.js';
+import { downloadSettingsBundle, copySettingsBundle, importFromEncoded } from '../utils/settingsBundle.js';
 
 export function renderSettings(container) {
   const s = getSettings();
@@ -75,6 +77,36 @@ export function renderSettings(container) {
       </fieldset>
 
       <fieldset>
+        <legend>Display</legend>
+        <div class="field">
+          <label for="chartTheme">Chart Theme</label>
+          <select id="chartTheme" name="chartTheme">
+            <option value="dark" ${s.chartTheme !== 'light' ? 'selected' : ''}>Dark</option>
+            <option value="light" ${s.chartTheme === 'light' ? 'selected' : ''}>Light</option>
+          </select>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Alert Delivery</legend>
+        <div class="field">
+          <label for="alertWebhookUrl">Webhook URL (Telegram, Discord, IFTTT)</label>
+          <input type="url" id="alertWebhookUrl" name="alertWebhookUrl" placeholder="https://…" value="${esc(s.alertWebhookUrl)}" />
+          <p class="field-hint">POST JSON when alerts fire. Works with Telegram bot webhooks and Discord.</p>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Sync Settings (cross-device)</legend>
+        <p class="field-hint">Export your API keys and preferences to use on another computer.</p>
+        <div class="export-btn-row">
+          <button type="button" class="btn-secondary" id="export-settings">Download JSON</button>
+          <button type="button" class="btn-secondary" id="copy-settings">Copy Sync Code</button>
+          <button type="button" class="btn-secondary" id="import-settings">Import Sync Code</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
         <legend>Watchlist</legend>
         <div class="field">
           <label for="watchlist">Symbols (comma-separated)</label>
@@ -116,9 +148,12 @@ export function renderSettings(container) {
       watchlist,
       pushNotifications,
       alertSound: fd.get('alertSound') === 'on',
+      chartTheme: fd.get('chartTheme') || 'dark',
+      alertWebhookUrl: fd.get('alertWebhookUrl'),
     });
 
     clearMarketWidgetCache();
+    clearLiveAdvancedCache();
 
     if (pushNotifications && getNotificationPermission() === 'default') {
       await requestNotificationPermission();
@@ -138,6 +173,23 @@ export function renderSettings(container) {
     status.className = `api-status ${result.valid ? 'ok' : 'err'}`;
   });
 
+  container.querySelector('#export-settings')?.addEventListener('click', () => downloadSettingsBundle());
+  container.querySelector('#copy-settings')?.addEventListener('click', async () => {
+    await copySettingsBundle();
+    showSaved(container, 'Sync code copied to clipboard.');
+  });
+  container.querySelector('#import-settings')?.addEventListener('click', () => {
+    const code = prompt('Paste your sync code:');
+    if (!code) return;
+    try {
+      importFromEncoded(code);
+      showSaved(container, 'Settings imported — reloading…');
+      setTimeout(() => window.dispatchEvent(new CustomEvent('stockviz:settings-saved')), 500);
+    } catch (e) {
+      alert(e.message || 'Import failed');
+    }
+  });
+
   container.querySelector('#test-api')?.addEventListener('click', async () => {
     const key = container.querySelector('#apiKey').value;
     const status = container.querySelector('#api-status');
@@ -149,14 +201,14 @@ export function renderSettings(container) {
   });
 }
 
-function showSaved(container) {
+function showSaved(container, msg = 'Settings saved.') {
   let toast = container.querySelector('.save-toast');
   if (!toast) {
     toast = document.createElement('p');
     toast.className = 'save-toast';
     container.querySelector('.settings-form')?.appendChild(toast);
   }
-  toast.textContent = 'Settings saved.';
+  toast.textContent = msg;
   setTimeout(() => toast.remove(), 2500);
 }
 
