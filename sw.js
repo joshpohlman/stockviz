@@ -1,4 +1,4 @@
-const CACHE = 'stockviz-v1';
+const CACHE = 'stockviz-v2';
 const ASSETS = ['./', './index.html'];
 
 self.addEventListener('install', (e) => {
