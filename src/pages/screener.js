@@ -68,8 +68,11 @@ export function renderScreener(container) {
         <div class="filter-group"><label>Min MCap</label><select name="minMarketCap"><option value="">Any</option><option value="10000000000" ${filters.minMarketCap === '10000000000' ? 'selected' : ''}>$10B+</option><option value="50000000000" ${filters.minMarketCap === '50000000000' ? 'selected' : ''}>$50B+</option><option value="100000000000" ${filters.minMarketCap === '100000000000' ? 'selected' : ''}>$100B+</option></select></div>
       </div>
       <div class="filter-panel" data-panel="fund" hidden>
-        <div class="filter-group"><label>Min P/E</label><input type="number" name="minPe" value="${esc(filters.minPe)}" /></div>
-        <div class="filter-group"><label>Max P/E</label><input type="number" name="maxPe" value="${esc(filters.maxPe)}" /></div>
+        <div class="filter-group"><label>Min P/E</label><input type="number" name="minPe" step="0.1" value="${esc(filters.minPe)}" /></div>
+        <div class="filter-group"><label>Max P/E</label><input type="number" name="maxPe" step="0.1" value="${esc(filters.maxPe)}" /></div>
+        <div class="filter-group"><label>Min PEG</label><input type="number" name="minPeg" step="0.1" value="${esc(filters.minPeg)}" /></div>
+        <div class="filter-group"><label>Max PEG</label><input type="number" name="maxPeg" step="0.1" value="${esc(filters.maxPeg)}" /></div>
+        <div class="filter-group"><label>Min Div %</label><input type="number" name="minDivYield" step="0.1" value="${esc(filters.minDivYield)}" /></div>
       </div>
       <div class="filter-panel" data-panel="tech" hidden>
         <div class="filter-group"><label>Min RSI</label><input type="number" name="minRsi" value="${esc(filters.minRsi)}" /></div>
@@ -121,14 +124,19 @@ export function renderScreener(container) {
             ${sortHeader('changePct', 'Change %', sort)}
             <th>Signal</th><th>Pattern</th>
             ${sortHeader('ta.rsi', 'RSI', sort)}
-            <th>P/E</th>
+            ${sortHeader('fundamentals.pe', 'P/E', sort)}
+            ${sortHeader('fundamentals.peg', 'PEG', sort)}
+            ${sortHeader('fundamentals.eps', 'EPS', sort)}
+            ${sortHeader('fundamentals.ps', 'P/S', sort)}
+            ${sortHeader('fundamentals.dividendYield', 'Div %', sort)}
+            ${sortHeader('fundamentals.beta', 'Beta', sort)}
             <th>Prediction</th>
             ${sortHeader('volume', 'Volume', sort)}
             ${sortHeader('marketCap', 'Market Cap', sort)}
           </tr>
         </thead>
         <tbody>
-          ${sorted.length ? sorted.map(renderRow).join('') : '<tr><td colspan="13" class="empty-row">No matches — adjust filters</td></tr>'}
+          ${sorted.length ? sorted.map(renderRow).join('') : '<tr><td colspan="18" class="empty-row">No matches — adjust filters</td></tr>'}
         </tbody>
       </table>
     </div>
@@ -249,6 +257,11 @@ function renderRow(q) {
       <td class="pattern-label">${q.patternLabels?.[0] || '—'}</td>
       <td class="${(q.ta?.rsi ?? 50) > 70 ? 'neg' : (q.ta?.rsi ?? 50) < 30 ? 'pos' : ''}">${q.ta?.rsi?.toFixed(1) ?? '—'}</td>
       <td>${q.fundamentals?.pe ?? '—'}</td>
+      <td>${q.fundamentals?.peg ?? '—'}</td>
+      <td>${q.fundamentals?.eps != null ? q.fundamentals.eps.toFixed(2) : '—'}</td>
+      <td>${q.fundamentals?.ps ?? '—'}</td>
+      <td>${q.fundamentals?.dividendYield != null ? `${q.fundamentals.dividendYield}%` : '—'}</td>
+      <td>${q.fundamentals?.beta ?? '—'}</td>
       <td class="${q.prediction?.direction === 'bullish' ? 'pos' : q.prediction?.direction === 'bearish' ? 'neg' : ''}">${q.prediction ? `${q.prediction.direction} ${q.prediction.confidence}%` : '—'}</td>
       <td>${fmtVolume(q.volume)}</td>
       <td>${fmtMarketCap(q.marketCap)}</td>

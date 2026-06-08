@@ -19,6 +19,9 @@ export function applyFiltersFromQuotes(quotes, f) {
     if (f.maxRsi !== '' && (q.ta?.rsi ?? 50) > Number(f.maxRsi)) return false;
     if (f.minPe !== '' && (q.fundamentals?.pe ?? 0) < Number(f.minPe)) return false;
     if (f.maxPe !== '' && (q.fundamentals?.pe ?? 999) > Number(f.maxPe)) return false;
+    if (f.minPeg !== '' && (q.fundamentals?.peg ?? 0) < Number(f.minPeg)) return false;
+    if (f.maxPeg !== '' && (q.fundamentals?.peg ?? 999) > Number(f.maxPeg)) return false;
+    if (f.minDivYield !== '' && (q.fundamentals?.dividendYield ?? 0) < Number(f.minDivYield)) return false;
 
     if (f.signal && !q.signals?.some((s) => s.id === f.signal)) return false;
     if (f.pattern && !q.patterns?.some((p) => p.id === f.pattern)) return false;

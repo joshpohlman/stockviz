@@ -2,7 +2,8 @@ import { getFilters, updateFilters } from '../store.js';
 
 const FILTER_KEYS = [
   'sector', 'industry', 'minChange', 'maxChange', 'minVolume', 'minMarketCap', 'search',
-  'signal', 'pattern', 'prediction', 'minRsi', 'maxRsi', 'minPe', 'maxPe', 'aboveSma50', 'aboveSma200', 'formula',
+  'signal', 'pattern', 'prediction', 'minRsi', 'maxRsi', 'minPe', 'maxPe', 'minPeg', 'maxPeg', 'minDivYield',
+  'aboveSma50', 'aboveSma200', 'formula',
 ];
 
 export function parseFiltersFromHash() {

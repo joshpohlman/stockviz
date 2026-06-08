@@ -1,7 +1,8 @@
 import { detectPatterns } from './patterns.js';
 import { detectSignals } from './signals.js';
 import { predictTrend } from './predictor.js';
-import { rsi, sma, avgVolume } from './indicators.js';
+import { avgVolume } from './indicators.js';
+import { buildFundamentals } from './fundamentals.js';
 
 const candleCache = new Map();
 
@@ -48,18 +49,15 @@ function seededRand(seed) {
   };
 }
 
-/** Full TA enrichment — patterns, signals, prediction, fundamentals mock. */
-export function enrichWithTA(quote) {
+/** Full TA enrichment — patterns, signals, prediction, TradingView-style fundamentals. */
+export function enrichWithTA(quote, { finnhubMetrics = null } = {}) {
   const candles = updateCandleCache(quote.symbol, quote);
-  const closes = candles.map((c) => c.c);
   const patterns = detectPatterns(candles);
   const signals = detectSignals(candles, quote);
   const prediction = predictTrend(candles, quote, patterns);
 
   const volAvg = avgVolume(candles);
-  const pe = mockFundamental(quote.symbol, 'pe');
-  const eps = mockFundamental(quote.symbol, 'eps');
-  const beta = mockFundamental(quote.symbol, 'beta');
+  const fundamentals = buildFundamentals(quote, candles, finnhubMetrics);
 
   return {
     ...quote,
@@ -75,20 +73,11 @@ export function enrichWithTA(quote) {
       atr: prediction.atr,
       relVolume: volAvg ? (quote.volume || volAvg) / volAvg : 1,
     },
-    fundamentals: { pe, eps, beta, dividend: mockFundamental(quote.symbol, 'div') },
+    fundamentals,
     signalLabels: signals.map((s) => s.label),
     patternLabels: patterns.map((p) => p.label),
     primarySignal: signals[0]?.label || patterns[0]?.label || '—',
   };
-}
-
-function mockFundamental(symbol, field) {
-  const r = seededRand(symbol + field)();
-  if (field === 'pe') return Math.round((8 + r * 45) * 10) / 10;
-  if (field === 'eps') return Math.round((0.5 + r * 12) * 100) / 100;
-  if (field === 'beta') return Math.round((0.6 + r * 1.8) * 100) / 100;
-  if (field === 'div') return Math.round(r * 3.5 * 100) / 100;
-  return 0;
 }
 
 export function getMarketBreadth(quotes) {

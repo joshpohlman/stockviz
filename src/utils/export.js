@@ -2,7 +2,9 @@ import { fmtPrice } from './format.js';
 
 const FULL_HEADERS = [
   'Symbol', 'Company', 'Sector', 'Industry', 'Price', 'Change', 'Change %',
-  'Volume', 'Market Cap', 'RSI', 'SMA20', 'SMA50', 'SMA200', 'P/E', 'Beta',
+  'Volume', 'Market Cap', 'RSI', 'SMA20', 'SMA50', 'SMA200',
+  'P/E', 'Forward P/E', 'PEG', 'P/S', 'P/B', 'EV/EBITDA', 'EPS', 'EPS Fwd', 'EPS Growth',
+  'Div Yield', 'Beta', '52W High', '52W Low', 'ROE', 'Net Margin', 'Short %',
   'Primary Signal', 'Pattern', 'Prediction', 'Confidence', 'Target', 'Target %',
 ];
 
@@ -27,7 +29,21 @@ function rowToCsv(q) {
     q.ta?.sma50?.toFixed(2) ?? '',
     q.ta?.sma200?.toFixed(2) ?? '',
     q.fundamentals?.pe ?? '',
+    q.fundamentals?.peFwd ?? '',
+    q.fundamentals?.peg ?? '',
+    q.fundamentals?.ps ?? '',
+    q.fundamentals?.pb ?? '',
+    q.fundamentals?.evEbitda ?? '',
+    q.fundamentals?.eps ?? '',
+    q.fundamentals?.epsFwd ?? '',
+    q.fundamentals?.epsGrowth ?? '',
+    q.fundamentals?.dividendYield ?? '',
     q.fundamentals?.beta ?? '',
+    q.fundamentals?.high52 ?? '',
+    q.fundamentals?.low52 ?? '',
+    q.fundamentals?.roe ?? '',
+    q.fundamentals?.netMargin ?? '',
+    q.fundamentals?.shortPct ?? '',
     csvEsc(q.primarySignal),
     csvEsc(q.patternLabels?.join('; ')),
     q.prediction?.direction ?? '',

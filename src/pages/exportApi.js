@@ -72,7 +72,7 @@ export function renderExportApi(container) {
           <tr><td>signals[]</td><td>array</td><td>Active TA signals (Overbought, Golden Cross…)</td></tr>
           <tr><td>patterns[]</td><td>array</td><td>Detected chart patterns with confidence</td></tr>
           <tr><td>prediction</td><td>object</td><td>direction, confidence, priceTarget, factors</td></tr>
-          <tr><td>fundamentals</td><td>object</td><td>P/E, EPS, Beta, Dividend</td></tr>
+          <tr><td>fundamentals</td><td>object</td><td>P/E, PEG, P/S, P/B, EV/EBITDA, EPS, margins, div yield, beta, 52W range, performance, ownership</td></tr>
         </tbody>
       </table>
     </section>

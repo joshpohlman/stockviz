@@ -1,5 +1,6 @@
 import { UNIVERSE } from './data/universe.js';
 import { enrichWithTA } from './analysis/enrich.js';
+import { mapFinnhubMetrics } from './analysis/fundamentals.js';
 
 const FINNHUB_BASE = 'https://finnhub.io/api/v1';
 const BATCH_SIZE = 5;
@@ -229,19 +230,38 @@ export async function fetchAllQuotes(settings) {
   return { quotes, source: 'finnhub' };
 }
 
+async function fetchFinnhubMetrics(symbol, apiKey) {
+  const url = `${FINNHUB_BASE}/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${apiKey}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return mapFinnhubMetrics(data);
+}
+
 export async function fetchSingleQuote(symbol, settings) {
   const meta = UNIVERSE.find((s) => s.symbol === symbol);
   if (!settings.apiKey?.trim() || settings.useMockData) {
     return meta ? enrichWithTA(buildMockQuote(meta)) : null;
   }
   try {
-    const [quote, profile] = await Promise.all([
-      fetchFinnhubQuote(symbol, settings.apiKey.trim()),
-      fetchFinnhubProfile(symbol, settings.apiKey.trim()),
+    const key = settings.apiKey.trim();
+    const [quote, profile, metrics] = await Promise.all([
+      fetchFinnhubQuote(symbol, key),
+      fetchFinnhubProfile(symbol, key),
+      fetchFinnhubMetrics(symbol, key).catch(() => null),
     ]);
-    return enrichWithTA(enrichQuote(quote, meta, profile));
+    return enrichWithTA(enrichQuote(quote, meta, profile), { finnhubMetrics: metrics });
   } catch {
     return meta ? enrichWithTA(buildMockQuote(meta)) : null;
+  }
+}
+
+export async function fetchStockMetrics(symbol, settings) {
+  if (!settings.apiKey?.trim() || settings.useMockData) return null;
+  try {
+    return await fetchFinnhubMetrics(symbol, settings.apiKey.trim());
+  } catch {
+    return null;
   }
 }
 

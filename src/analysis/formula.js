@@ -1,15 +1,29 @@
 /** Safe custom formula evaluator for screener — no eval(). */
 
 const ALLOWED_FIELDS = new Set([
-  'price', 'changePct', 'volume', 'marketCap', 'rsi', 'pe', 'eps', 'beta',
-  'relVolume', 'sma20', 'sma50', 'sma200', 'predConf', 'atr',
+  'price', 'changePct', 'volume', 'marketCap', 'rsi', 'pe', 'peFwd', 'peg', 'ps', 'pb',
+  'eps', 'epsFwd', 'epsGrowth', 'beta', 'dividendYield', 'payoutRatio', 'grossMargin', 'netMargin', 'roe',
+  'relVolume', 'sma20', 'sma50', 'sma200', 'predConf', 'atr', 'shortPct', 'instPct',
 ]);
 
 const FIELD_MAP = {
   rsi: (q) => q.ta?.rsi ?? 50,
   pe: (q) => q.fundamentals?.pe ?? 0,
+  peFwd: (q) => q.fundamentals?.peFwd ?? 0,
+  peg: (q) => q.fundamentals?.peg ?? 0,
+  ps: (q) => q.fundamentals?.ps ?? 0,
+  pb: (q) => q.fundamentals?.pb ?? 0,
   eps: (q) => q.fundamentals?.eps ?? 0,
+  epsFwd: (q) => q.fundamentals?.epsFwd ?? 0,
+  epsGrowth: (q) => q.fundamentals?.epsGrowth ?? 0,
   beta: (q) => q.fundamentals?.beta ?? 1,
+  dividendYield: (q) => q.fundamentals?.dividendYield ?? 0,
+  payoutRatio: (q) => q.fundamentals?.payoutRatio ?? 0,
+  grossMargin: (q) => q.fundamentals?.grossMargin ?? 0,
+  netMargin: (q) => q.fundamentals?.netMargin ?? 0,
+  roe: (q) => q.fundamentals?.roe ?? 0,
+  shortPct: (q) => q.fundamentals?.shortPct ?? 0,
+  instPct: (q) => q.fundamentals?.instPct ?? 0,
   relVolume: (q) => q.ta?.relVolume ?? 1,
   sma20: (q) => q.ta?.sma20 ?? q.price,
   sma50: (q) => q.ta?.sma50 ?? q.price,
@@ -192,7 +206,8 @@ function parsePrimary(tokens, pos, ctx) {
 
 export const FORMULA_EXAMPLES = [
   { label: 'Oversold bounce', formula: 'rsi < 35 and changePct > 0' },
+  { label: 'Value + PEG', formula: 'peg < 1.5 and pe < 25 and epsGrowth > 5' },
+  { label: 'Dividend value', formula: 'dividendYield > 2 and pe < 20 and payoutRatio < 60' },
+  { label: 'Growth at reasonable price', formula: 'peg < 2 and epsGrowth > 10 and ps < 8' },
   { label: 'High volume breakout', formula: 'relVolume > 1.5 and changePct > 2' },
-  { label: 'Value + momentum', formula: 'pe < 25 and changePct > 1 and rsi > 45' },
-  { label: 'Strong prediction', formula: 'predConf > 70 and changePct > 0' },
 ];
