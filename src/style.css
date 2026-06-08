@@ -1102,6 +1102,8 @@ kbd {
 .toast.show { opacity: 1; transform: none; }
 .toast-success { border-color: var(--green); }
 .toast-error { border-color: var(--red); }
+.quote-stale td { opacity: 0.75; }
+.quote-stale td[data-live="price"] { font-style: italic; }
 
 /* ═══ FINVIZ STYLE ═══ */
 .finviz-header { background: #010409; }

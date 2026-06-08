@@ -36,36 +36,62 @@ function delay(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/** FMP may return numbers as strings (e.g. "1.23" or "1.23%"). */
+export function parseFmpNum(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const s = String(value).trim().replace(/%$/, '').replace(/,/g, '');
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Normalize symbols for FMP (BRK.B → BRK-B). */
 export function toFmpSymbol(symbol) {
-  return symbol.replace('.', '-');
+  return symbol.replace(/\./g, '-');
 }
 
 export function fromFmpSymbol(symbol) {
   return symbol.replace(/-/g, '.');
 }
 
+export function normalizeQuoteSymbol(symbol) {
+  return fromFmpSymbol(symbol || '').toUpperCase();
+}
+
 function mapFmpQuote(row) {
-  if (row?.price == null) return null;
-  const sym = fromFmpSymbol(row.symbol);
-  const price = row.price;
-  const prevClose = row.previousClose ?? price;
-  const change = row.change ?? price - prevClose;
-  const changePct = row.changesPercentage ?? row.changePercentage ?? (prevClose ? (change / prevClose) * 100 : 0);
+  const price = parseFmpNum(row?.price);
+  if (price == null) return null;
+  const sym = normalizeQuoteSymbol(row.symbol);
+  const prevClose = parseFmpNum(row.previousClose) ?? price;
+  const change = parseFmpNum(row.change) ?? price - prevClose;
+  let changePct = parseFmpNum(row.changesPercentage) ?? parseFmpNum(row.changePercentage);
+  if (changePct == null && prevClose) changePct = (change / prevClose) * 100;
   return {
     symbol: sym,
     price,
-    open: row.open ?? price,
-    high: row.dayHigh ?? row.high ?? price,
-    low: row.dayLow ?? row.low ?? price,
+    open: parseFmpNum(row.open) ?? price,
+    high: parseFmpNum(row.dayHigh) ?? parseFmpNum(row.high) ?? price,
+    low: parseFmpNum(row.dayLow) ?? parseFmpNum(row.low) ?? price,
     prevClose,
     change,
-    changePct,
-    volume: row.volume ?? 0,
+    changePct: changePct ?? 0,
+    volume: parseFmpNum(row.volume) ?? 0,
     timestamp: row.timestamp ? row.timestamp * 1000 : Date.now(),
     name: row.name,
-    marketCap: row.marketCap,
+    marketCap: parseFmpNum(row.marketCap),
   };
+}
+
+export function lookupFmpQuote(map, symbol) {
+  if (!map?.size || !symbol) return null;
+  const norm = normalizeQuoteSymbol(symbol);
+  if (map.has(norm)) return map.get(norm);
+  const dashed = toFmpSymbol(norm);
+  if (map.has(dashed)) return map.get(dashed);
+  for (const [k, v] of map) {
+    if (normalizeQuoteSymbol(k) === norm) return v;
+  }
+  return null;
 }
 
 export async function fetchFmpBatchQuotes(symbols, apiKey, { onChunk } = {}) {
@@ -74,7 +100,7 @@ export async function fetchFmpBatchQuotes(symbols, apiKey, { onChunk } = {}) {
     const chunk = symbols.slice(i, i + QUOTE_CHUNK).map(toFmpSymbol);
     try {
       const data = await fmpFetch('/batch-quote', apiKey, { symbols: chunk.join(',') });
-      const rows = Array.isArray(data) ? data : [data];
+      const rows = Array.isArray(data) ? data : data?.symbol ? [data] : [];
       for (const row of rows) {
         if (!row?.symbol) continue;
         const mapped = mapFmpQuote(row);
@@ -88,6 +114,24 @@ export async function fetchFmpBatchQuotes(symbols, apiKey, { onChunk } = {}) {
     if (i + QUOTE_CHUNK < symbols.length) await delay(CHUNK_DELAY_MS);
   }
   return results;
+}
+
+/** Retry individual quotes for symbols missing from batch (symbol format / rate limits). */
+export async function fetchFmpMissingQuotes(symbols, existing, apiKey) {
+  const missing = symbols.filter((s) => !lookupFmpQuote(existing, s));
+  if (!missing.length) return existing;
+
+  for (let i = 0; i < missing.length; i += 5) {
+    const chunk = missing.slice(i, i + 5);
+    const rows = await Promise.allSettled(chunk.map((s) => fetchFmpQuote(s, apiKey)));
+    for (const r of rows) {
+      if (r.status === 'fulfilled' && r.value?.price != null) {
+        existing.set(r.value.symbol, r.value);
+      }
+    }
+    if (i + 5 < missing.length) await delay(350);
+  }
+  return existing;
 }
 
 export async function fetchFmpQuote(symbol, apiKey) {
@@ -223,9 +267,9 @@ export async function fetchFmpCommodityQuotes(apiKey) {
   return (Array.isArray(data) ? data : []).filter((q) => map[q.symbol] || q.name).slice(0, 7).map((q) => ({
     name: map[q.symbol] || q.name || q.symbol,
     symbol: q.symbol,
-    last: q.price ?? 0,
-    change: q.change ?? 0,
-    changePct: q.changesPercentage ?? q.changePercentage ?? 0,
+    last: parseFmpNum(q.price) ?? 0,
+    change: parseFmpNum(q.change) ?? 0,
+    changePct: parseFmpNum(q.changesPercentage) ?? parseFmpNum(q.changePercentage) ?? 0,
   }));
 }
 
@@ -240,7 +284,7 @@ export async function fetchFmpForexQuotes(apiKey) {
       symbol: q.symbol,
       last: q.price ?? 0,
       change: q.change ?? 0,
-      changePct: q.changesPercentage ?? q.changePercentage ?? 0,
+      changePct: parseFmpNum(q.changesPercentage) ?? parseFmpNum(q.changePercentage) ?? 0,
     }));
 }
 
@@ -255,9 +299,9 @@ export async function fetchFmpIndexQuotes(apiKey) {
   return (Array.isArray(data) ? data : []).filter((q) => map[q.symbol]).map((q) => ({
     name: map[q.symbol],
     symbol: q.symbol,
-    last: q.price ?? 0,
-    change: q.change ?? 0,
-    changePct: q.changesPercentage ?? q.changePercentage ?? 0,
+    last: parseFmpNum(q.price) ?? 0,
+    change: parseFmpNum(q.change) ?? 0,
+    changePct: parseFmpNum(q.changesPercentage) ?? parseFmpNum(q.changePercentage) ?? 0,
   }));
 }
 
@@ -537,7 +581,7 @@ export async function fetchFmpIndexTickerQuotes(apiKey) {
       label: meta.label,
       price: q.price ?? 0,
       change: q.change ?? 0,
-      changePct: q.changesPercentage ?? q.changePercentage ?? 0,
+      changePct: parseFmpNum(q.changesPercentage) ?? parseFmpNum(q.changePercentage) ?? 0,
       isIndex: true,
     });
   }

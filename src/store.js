@@ -49,6 +49,9 @@ let sort = { key: 'changePct', dir: 'desc' };
 let selectedSymbol = null;
 let lastFetchAt = null;
 let dataSource = 'mock';
+let liveQuoteCount = 0;
+let staleQuoteCount = 0;
+let missingQuoteCount = 0;
 let marketStatus = null;
 let listeners = new Set();
 let pollTimer = null;
@@ -184,6 +187,9 @@ export function setQuotes(newQuotes, meta = {}) {
   quotes = newQuotes;
   lastFetchAt = meta.fetchedAt ?? Date.now();
   dataSource = meta.source ?? dataSource;
+  liveQuoteCount = meta.liveCount ?? [...newQuotes.values()].filter((q) => q.live).length;
+  staleQuoteCount = meta.staleCount ?? [...newQuotes.values()].filter((q) => q.stale).length;
+  missingQuoteCount = meta.missingCount ?? 0;
   notify('quotes');
 }
 
@@ -197,7 +203,14 @@ export function getMarketStatus() {
 }
 
 export function getMeta() {
-  return { lastFetchAt, dataSource, selectedSymbol };
+  return {
+    lastFetchAt,
+    dataSource,
+    selectedSymbol,
+    liveQuoteCount,
+    staleQuoteCount,
+    missingQuoteCount,
+  };
 }
 
 export function setSelectedSymbol(symbol) {

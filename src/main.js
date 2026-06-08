@@ -45,6 +45,7 @@ import { renderDividends } from './pages/dividends.js';
 import { renderPaperTrading } from './pages/paperTrading.js';
 import { fetchTickerIndices, clearLiveAdvancedCache } from './api/liveAdvanced.js';
 import { clearMarketWidgetCache } from './api/marketExtras.js';
+import { clearQuoteCache } from './api.js';
 import { initKeyboardShortcuts } from './utils/keyboard.js';
 import { deliverAlertWebhook } from './utils/alertDelivery.js';
 import { applyFiltersFromUrl } from './utils/urlState.js';
@@ -102,11 +103,18 @@ async function refreshQuotes() {
   quotesLoading = true;
   updateStatus('loading');
   try {
-    const [{ quotes, source }, status] = await Promise.all([
+    const [{ quotes, source, liveCount, staleCount, missingCount }, status] = await Promise.all([
       fetchAllQuotes(settings, {
         onProgress: (partial, src) => {
-          setQuotes(partial, { fetchedAt: Date.now(), source: src });
-          if (currentRoute === '/' && homeQuoteRenderPending && partial.size >= 80) {
+          const live = [...partial.values()].filter((q) => q.live).length;
+          const stale = [...partial.values()].filter((q) => q.stale).length;
+          setQuotes(partial, {
+            fetchedAt: Date.now(),
+            source: src,
+            liveCount: live,
+            staleCount: stale,
+          });
+          if (currentRoute === '/' && homeQuoteRenderPending && live >= 80) {
             homeQuoteRenderPending = false;
             requestAnimationFrame(() => navigate(false));
           }
@@ -114,7 +122,13 @@ async function refreshQuotes() {
       }),
       fetchMarketStatus(settings),
     ]);
-    setQuotes(quotes, { fetchedAt: Date.now(), source });
+    setQuotes(quotes, {
+      fetchedAt: Date.now(),
+      source,
+      liveCount,
+      staleCount,
+      missingCount,
+    });
     setMarketStatus(status);
     updateStatus(source);
     const fired = checkAlerts(quotes);
@@ -160,16 +174,29 @@ function updateStatus(source) {
   if (source === 'loading') {
     dot.className = 'status-dot';
     text.textContent = 'Loading quotes…';
-  } else if (source === 'error') {
+  } else if (source === 'error' || source === 'fmp-failed') {
     dot.className = 'status-dot';
-    text.textContent = 'Update failed';
-  } else if (source === 'fmp' || source === 'fmp-partial') {
-    dot.className = 'status-dot live';
+    text.textContent = source === 'fmp-failed'
+      ? 'FMP quotes failed — check API key in Settings'
+      : 'Update failed';
+  } else if (source === 'fmp' || source === 'fmp-partial' || source === 'fmp-stale') {
     const uni = getUniverseMeta();
-    const partial = source === 'fmp-partial' ? ' · partial' : '';
-    text.textContent = uni.source === 'sp500'
-      ? `Live · FMP · ${uni.label}${partial}`
-      : `Live · FMP${partial}`;
+    const live = meta.liveQuoteCount ?? 0;
+    const stale = meta.staleQuoteCount ?? 0;
+    const total = uni.count || live + stale;
+    if (source === 'fmp-stale') {
+      dot.className = 'status-dot';
+      text.textContent = `Cached · FMP · ${stale}/${total} (refresh failed)`;
+    } else if (source === 'fmp-partial') {
+      dot.className = 'status-dot live';
+      const extra = stale ? ` · ${stale} cached` : '';
+      text.textContent = `Live · FMP · ${live}/${total}${extra}`;
+    } else {
+      dot.className = 'status-dot live';
+      text.textContent = uni.source === 'sp500'
+        ? `Live · FMP · ${live}/${total}`
+        : `Live · FMP · ${live} quotes`;
+    }
   } else if (source === 'finnhub') {
     dot.className = 'status-dot live';
     text.textContent = 'Live · Finnhub';
@@ -332,6 +359,7 @@ function boot() {
     clearHomeIndicesCache();
     clearLiveAdvancedCache();
     clearMarketWidgetCache();
+    clearQuoteCache();
     await initUniverse(getSettings());
     refreshQuotes().then(() => startPolling(refreshQuotes));
   });

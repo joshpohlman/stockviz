@@ -257,7 +257,7 @@ function sortHeader(key, label, sort) {
 function renderRow(q) {
   const fav = isFavorite(q.symbol);
   return `
-    <tr class="clickable" data-live-symbol="${q.symbol}" data-symbol="${q.symbol}">
+    <tr class="clickable${q.stale ? ' quote-stale' : ''}${q.live === false && !q.stale ? ' quote-sim' : ''}" data-live-symbol="${q.symbol}" data-symbol="${q.symbol}" title="${q.stale ? 'Cached quote — live fetch failed' : q.live === false ? 'Simulated price' : ''}">
       <td class="col-star">
         <button class="star-btn ${fav ? 'starred' : ''}" data-fav="${q.symbol}" aria-label="Favorite">${fav ? '★' : '☆'}</button>
       </td>
@@ -265,7 +265,7 @@ function renderRow(q) {
       <td class="name-cell">${q.name || '—'}</td>
       <td>${sparklineHtml(q.symbol)}</td>
       <td class="sector-cell">${q.sector || '—'}</td>
-      <td data-live="price">$${fmtPrice(q.price)}</td>
+      <td data-live="price">${q.stale ? '⏱ ' : ''}$${fmtPrice(q.price)}</td>
       <td class="${changeClass(q.changePct)}" data-live="pct">${fmtPct(q.changePct)}</td>
       <td class="signal-tag">${q.primarySignal || '—'}</td>
       <td class="pattern-label">${q.patternLabels?.[0] || '—'}</td>

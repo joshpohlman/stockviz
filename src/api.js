@@ -3,6 +3,8 @@ import { enrichWithTA } from './analysis/enrich.js';
 import { mapFinnhubMetrics, mapFmpMetrics } from './analysis/fundamentals.js';
 import {
   fetchFmpBatchQuotes,
+  fetchFmpMissingQuotes,
+  lookupFmpQuote,
   fetchFmpQuote,
   fetchFmpProfile,
   fetchFmpFundamentals,
@@ -18,6 +20,56 @@ import { getCachedMarketWidgets, setCachedMarketWidgets } from './api/marketExtr
 const FINNHUB_BASE = 'https://finnhub.io/api/v1';
 const BATCH_SIZE = 5;
 const BATCH_DELAY_MS = 1100;
+const QUOTE_CACHE_KEY = 'stockviz-live-quotes';
+const QUOTE_CACHE_TTL = 48 * 60 * 60 * 1000;
+
+function loadQuoteCache() {
+  try {
+    const raw = localStorage.getItem(QUOTE_CACHE_KEY);
+    if (!raw) return new Map();
+    const { at, rows } = JSON.parse(raw);
+    if (Date.now() - at > QUOTE_CACHE_TTL) return new Map();
+    return new Map(rows.map((r) => [r.symbol, r]));
+  } catch {
+    return new Map();
+  }
+}
+
+function saveQuoteCache(quotes) {
+  try {
+    const rows = [...quotes.values()]
+      .filter((q) => q.live && q.price != null)
+      .map((q) => ({
+        symbol: q.symbol,
+        price: q.price,
+        open: q.open,
+        high: q.high,
+        low: q.low,
+        prevClose: q.prevClose,
+        change: q.change,
+        changePct: q.changePct,
+        volume: q.volume,
+        marketCap: q.marketCap,
+        sector: q.sector,
+        industry: q.industry,
+        name: q.name,
+        timestamp: q.timestamp,
+      }));
+    if (!rows.length) return;
+    localStorage.setItem(QUOTE_CACHE_KEY, JSON.stringify({ at: Date.now(), rows }));
+  } catch { /* quota */ }
+}
+
+export function clearQuoteCache() {
+  localStorage.removeItem(QUOTE_CACHE_KEY);
+}
+
+function resolveFmpSource(liveCount, staleCount, total) {
+  if (liveCount === 0 && staleCount === 0) return 'fmp-failed';
+  if (liveCount === 0 && staleCount > 0) return 'fmp-stale';
+  if (liveCount < total) return 'fmp-partial';
+  return 'fmp';
+}
 
 export function getDataProvider(settings) {
   if (settings.useMockData) return 'mock';
@@ -45,8 +97,8 @@ let mockSparkHistory = new Map();
 const SPARK_LEN = 24;
 
 function initMockPrices() {
-  if (mockPrices.size) return;
   for (const stock of getUniverse()) {
+    if (mockPrices.has(stock.symbol)) continue;
     const p = basePrice(stock.symbol);
     mockPrices.set(stock.symbol, p);
     const rand = seededRandom(stock.symbol + 'hist');
@@ -225,10 +277,13 @@ export async function fetchAllQuotes(settings, { onProgress } = {}) {
   if (provider === 'fmp') {
     const apiKey = settings.fmpApiKey.trim();
     const quotes = new Map();
-    const enrichBatch = (fmpQuotes) => {
+    const cached = loadQuoteCache();
+    let fmpQuotes = new Map();
+
+    const enrichBatch = (batch, src = 'fmp') => {
       let added = false;
       for (const symbol of symbols) {
-        const q = fmpQuotes.get(symbol);
+        const q = lookupFmpQuote(batch, symbol);
         if (q?.price != null && !quotes.has(symbol)) {
           const meta = universeMap.get(symbol);
           const enriched = enrichQuote(q, meta);
@@ -236,31 +291,52 @@ export async function fetchAllQuotes(settings, { onProgress } = {}) {
             ...enriched,
             sparkline: pushSpark(symbol, enriched.price),
             live: true,
+            stale: false,
           }));
           added = true;
         }
       }
-      if (added && onProgress) onProgress(new Map(quotes), 'fmp');
+      if (added && onProgress) {
+        const live = [...quotes.values()].filter((r) => r.live).length;
+        onProgress(new Map(quotes), resolveFmpSource(live, 0, symbols.length));
+      }
     };
 
     try {
-      const fmpQuotes = await fetchFmpBatchQuotes(symbols, apiKey, {
+      fmpQuotes = await fetchFmpBatchQuotes(symbols, apiKey, {
         onChunk: (partial) => enrichBatch(partial),
       });
+      fmpQuotes = await fetchFmpMissingQuotes(symbols, fmpQuotes, apiKey);
       enrichBatch(fmpQuotes);
     } catch (err) {
       console.warn('FMP batch quotes failed:', err);
     }
 
-    let mockFilled = 0;
+    let staleFilled = 0;
     for (const stock of universe) {
-      if (!quotes.has(stock.symbol)) {
-        quotes.set(stock.symbol, enrichWithTA({ ...buildMockQuote(stock), live: false }));
-        mockFilled++;
+      if (quotes.has(stock.symbol)) continue;
+      const stale = cached.get(stock.symbol);
+      if (stale?.price != null) {
+        const meta = universeMap.get(stock.symbol);
+        quotes.set(stock.symbol, enrichWithTA({
+          ...enrichQuote(stale, meta),
+          live: false,
+          stale: true,
+        }));
+        staleFilled++;
       }
     }
-    const source = mockFilled > 0 && mockFilled < universe.length ? 'fmp-partial' : 'fmp';
-    return { quotes, source };
+
+    const liveCount = [...quotes.values()].filter((q) => q.live).length;
+    const source = resolveFmpSource(liveCount, staleFilled, universe.length);
+    if (liveCount > 0) saveQuoteCache(quotes);
+    return {
+      quotes,
+      source,
+      liveCount,
+      staleCount: staleFilled,
+      missingCount: universe.length - quotes.size,
+    };
   }
 
   const quotes = new Map();

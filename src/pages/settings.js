@@ -1,5 +1,6 @@
 import { getSettings, updateSettings } from '../store.js';
-import { validateApiKey, validateFmpApiKey } from '../api.js';
+import { validateApiKey, validateFmpApiKey, clearQuoteCache } from '../api.js';
+import { toast } from '../components/toast.js';
 import {
   isNotificationSupported, getNotificationPermission, requestNotificationPermission,
 } from '../utils/notifications.js';
@@ -160,11 +161,16 @@ export function renderSettings(container) {
       .filter(Boolean);
 
     const pushNotifications = fd.get('pushNotifications') === 'on';
+    const fmpKey = String(fd.get('fmpApiKey') || '').trim();
+    const useMockData = fd.get('useMockData') === 'on';
+    if (useMockData && fmpKey) {
+      toast('Simulated data is ON — prices will be fake. Uncheck "Force simulated data" for live FMP quotes.', 'error', 8000);
+    }
     updateSettings({
       fmpApiKey: fd.get('fmpApiKey'),
       apiKey: fd.get('apiKey'),
       refreshInterval: Number(fd.get('refreshInterval')) || 30,
-      useMockData: fd.get('useMockData') === 'on',
+      useMockData,
       watchlist,
       pushNotifications,
       alertSound: fd.get('alertSound') === 'on',
@@ -175,6 +181,7 @@ export function renderSettings(container) {
     clearMarketWidgetCache();
     clearLiveAdvancedCache();
     clearHomeIndicesCache();
+    clearQuoteCache();
 
     if (pushNotifications && getNotificationPermission() === 'default') {
       await requestNotificationPermission();
