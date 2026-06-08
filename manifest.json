@@ -1,0 +1,12 @@
+{
+  "name": "StockViz",
+  "short_name": "StockViz",
+  "description": "Finviz-style stock screener with live data and pattern prediction",
+  "start_url": "/stockviz/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    { "src": "/stockviz/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
